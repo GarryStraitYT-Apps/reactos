@@ -6,7 +6,6 @@
  * PROGRAMMERS:     Hervé Poussineau
  */
 
-#ifndef _M_ARM
 #include <freeldr.h>
 
 BOOLEAN NoUiInitialize(VOID)
@@ -78,23 +77,23 @@ VOID NoUiUpdateDateTime(VOID)
 {
 }
 
-VOID NoUiMessageBox(PCSTR MessageText)
+VOID
+NoUiMessageBox(
+    _In_ PCSTR MessageText)
 {
-    // We have not yet displayed the user interface
-    // We are probably still reading the .ini file
-    // and have encountered an error. Just use printf()
-    // and return.
-    printf("%s\n", MessageText);
-    printf("Press any key\n");
-    MachConsGetCh();
+    NoUiMessageBoxCritical(MessageText);
 }
 
-VOID NoUiMessageBoxCritical(PCSTR MessageText)
+VOID
+NoUiMessageBoxCritical(
+    _In_ PCSTR MessageText)
 {
-    // We have not yet displayed the user interface
-    // We are probably still reading the .ini file
-    // and have encountered an error. Just use printf()
-    // and return.
+    /*
+     * We have not yet displayed the user interface
+     * We are probably still reading the .ini file
+     * and have encountered an error. Just use printf()
+     * and return.
+     */
     printf("%s\n", MessageText);
     printf("Press any key\n");
     MachConsGetCh();
@@ -183,5 +182,3 @@ NoUiDrawMenu(
     _In_ PUI_MENU_INFO MenuInfo)
 {
 }
-
-#endif // _M_ARM

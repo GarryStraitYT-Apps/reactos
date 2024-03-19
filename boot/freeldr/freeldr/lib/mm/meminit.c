@@ -238,6 +238,7 @@ static
 VOID
 MmCheckFreeldrImageFile(VOID)
 {
+#ifndef UEFIBOOT
     PIMAGE_NT_HEADERS NtHeaders;
     PIMAGE_FILE_HEADER FileHeader;
     PIMAGE_OPTIONAL_HEADER OptionalHeader;
@@ -308,6 +309,7 @@ MmCheckFreeldrImageFile(VOID)
 
     /* Calculate the full image size */
     FrLdrImageSize = (ULONG_PTR)&__ImageBase + OptionalHeader->SizeOfImage - FREELDR_BASE;
+#endif
 }
 
 BOOLEAN MmInitializeMemoryManager(VOID)
@@ -417,9 +419,9 @@ PVOID MmFindLocationForPageLookupTable(PFN_NUMBER TotalPageCount)
     SIZE_T PageLookupTableSize;
     PFN_NUMBER RequiredPages;
     PFN_NUMBER CandidateBasePage = 0;
-    PFN_NUMBER CandidatePageCount;
+    PFN_NUMBER CandidatePageCount = 0;
     PFN_NUMBER PageLookupTableEndPage;
-    PVOID PageLookupTableMemAddress = NULL;
+    PVOID PageLookupTableMemAddress;
 
     // Calculate how much pages we need to keep the page lookup table
     PageLookupTableSize = TotalPageCount * sizeof(PAGE_LOOKUP_TABLE_ITEM);

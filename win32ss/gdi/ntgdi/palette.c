@@ -615,7 +615,7 @@ NtGdiResizePalette(
     XLATEOBJ *NewXlateObj = (int*) HeapReAlloc(GetProcessHeap(), 0, XlateObj, cEntries * sizeof(int));
     if(NewXlateObj == NULL)
     {
-      ERR("Can not resize logicalToSystem -- out of memory!");
+      ERR("Can not resize logicalToSystem -- out of memory!\n");
       GDI_ReleaseObj( hPal );
       return FALSE;
     }
@@ -961,7 +961,7 @@ IntSetPaletteEntries(
     PPALETTE palGDI;
     ULONG numEntries;
 
-    if ((UINT_PTR)hpal & GDI_HANDLE_STOCK_MASK)
+    if (GDI_HANDLE_IS_STOCKOBJ(hpal))
     {
     	return 0;
     }
@@ -1245,7 +1245,7 @@ NtGdiUnrealizeObject(HGDIOBJ hgdiobj)
    PPALETTE palGDI;
 
    if ( !hgdiobj ||
-        ((UINT_PTR)hgdiobj & GDI_HANDLE_STOCK_MASK) ||
+        GDI_HANDLE_IS_STOCKOBJ(hgdiobj) ||
         !GDI_HANDLE_IS_TYPE(hgdiobj, GDI_OBJECT_TYPE_PALETTE) )
       return Ret;
 

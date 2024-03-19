@@ -13,6 +13,7 @@
 #include <ntoskrnl.h>
 #define NDEBUG
 #include <debug.h>
+#include <mm/ARM3/miarm.h>
 
 /* GLOBALS ********************************************************************/
 
@@ -32,7 +33,6 @@ static const WCHAR ServicesKeyName[] = L"\\Registry\\Machine\\System\\CurrentCon
 
 POBJECT_TYPE IoDriverObjectType = NULL;
 
-extern BOOLEAN ExpInTextModeSetup;
 extern BOOLEAN PnpSystemInit;
 extern BOOLEAN PnPBootDriversLoaded;
 extern KEVENT PiEnumerationFinished;
@@ -272,60 +272,75 @@ Cleanup:
     return status;
 }
 
-/*
- * RETURNS
- *  TRUE if String2 contains String1 as a suffix.
- */
-BOOLEAN
-NTAPI
+/**
+ * @brief   Determines whether String1 may be a suffix of String2.
+ * @return  TRUE if String2 contains String1 as a suffix.
+ **/
+static BOOLEAN
 IopSuffixUnicodeString(
-    IN PCUNICODE_STRING String1,
-    IN PCUNICODE_STRING String2)
+    _In_ PCUNICODE_STRING String1,
+    _In_ PCUNICODE_STRING String2,
+    _In_ BOOLEAN CaseInSensitive)
 {
-    PWCHAR pc1;
-    PWCHAR pc2;
-    ULONG Length;
+    PWCHAR pc1, pc2;
+    ULONG NumChars;
 
     if (String2->Length < String1->Length)
         return FALSE;
 
-    Length = String1->Length / 2;
+    NumChars = String1->Length / sizeof(WCHAR);
     pc1 = String1->Buffer;
-    pc2 = &String2->Buffer[String2->Length / sizeof(WCHAR) - Length];
+    pc2 = &String2->Buffer[String2->Length / sizeof(WCHAR) - NumChars];
 
     if (pc1 && pc2)
     {
-        while (Length--)
+        if (CaseInSensitive)
         {
-            if( *pc1++ != *pc2++ )
-                return FALSE;
+            while (NumChars--)
+            {
+                if (RtlUpcaseUnicodeChar(*pc1++) !=
+                    RtlUpcaseUnicodeChar(*pc2++))
+                {
+                    return FALSE;
+                }
+            }
         }
+        else
+        {
+            while (NumChars--)
+            {
+                if (*pc1++ != *pc2++)
+                    return FALSE;
+            }
+        }
+
         return TRUE;
     }
+
     return FALSE;
 }
 
-/*
- * IopDisplayLoadingMessage
- *
- * Display 'Loading XXX...' message.
- */
-VOID
+/**
+ * @brief   Displays a driver-loading message in SOS mode.
+ **/
+static VOID
 FASTCALL
-IopDisplayLoadingMessage(PUNICODE_STRING ServiceName)
+IopDisplayLoadingMessage(
+    _In_ PCUNICODE_STRING ServiceName)
 {
+    extern BOOLEAN SosEnabled; // See ex/init.c
+    static const UNICODE_STRING DotSys = RTL_CONSTANT_STRING(L".SYS");
     CHAR TextBuffer[256];
-    UNICODE_STRING DotSys = RTL_CONSTANT_STRING(L".SYS");
 
-    if (ExpInTextModeSetup) return;
+    if (!SosEnabled) return;
     if (!KeLoaderBlock) return;
-    RtlUpcaseUnicodeString(ServiceName, ServiceName, FALSE);
-    snprintf(TextBuffer, sizeof(TextBuffer),
-            "%s%sSystem32\\Drivers\\%wZ%s\r\n",
-            KeLoaderBlock->ArcBootDeviceName,
-            KeLoaderBlock->NtBootPathName,
-            ServiceName,
-            IopSuffixUnicodeString(&DotSys, ServiceName) ? "" : ".SYS");
+    RtlStringCbPrintfA(TextBuffer, sizeof(TextBuffer),
+                       "%s%sSystem32\\Drivers\\%wZ%s\r\n",
+                       KeLoaderBlock->ArcBootDeviceName,
+                       KeLoaderBlock->NtBootPathName,
+                       ServiceName,
+                       IopSuffixUnicodeString(&DotSys, ServiceName, TRUE)
+                           ? "" : ".SYS");
     HalDisplayString(TextBuffer);
 }
 
@@ -643,7 +658,7 @@ IopInitializeDriverModule(
         driverObject->Flags &= ~DRVO_LEGACY_DRIVER;
     }
 
-    // Windows does this fixup - keep it for compatibility
+    /* Windows does this fixup, keep it for compatibility */
     for (INT i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; i++)
     {
         /*
@@ -710,7 +725,7 @@ LdrProcessDriverModule(PLDR_DATA_TABLE_ENTRY LdrEntry,
 {
     NTSTATUS Status;
     UNICODE_STRING BaseName, BaseDirectory;
-    PLOAD_IMPORTS LoadedImports = (PVOID)-2;
+    PLOAD_IMPORTS LoadedImports = MM_SYSLDR_NO_IMPORTS;
     PCHAR MissingApiName, Buffer;
     PWCHAR MissingDriverName;
     PVOID DriverBase = LdrEntry->DllBase;
@@ -941,7 +956,7 @@ IopInitializeBuiltinDriver(IN PLDR_DATA_TABLE_ENTRY BootLdrEntry)
         {
             WCHAR num[11];
             UNICODE_STRING instancePath;
-            RtlStringCchPrintfW(num, sizeof(num), L"%u", i);
+            RtlStringCbPrintfW(num, sizeof(num), L"%u", i);
 
             Status = IopGetRegistryValue(enumServiceHandle, num, &kvInfo);
             if (!NT_SUCCESS(Status))
@@ -967,9 +982,16 @@ IopInitializeBuiltinDriver(IN PLDR_DATA_TABLE_ENTRY BootLdrEntry)
                 instancePath.Buffer[instancePath.Length / sizeof(WCHAR)] = UNICODE_NULL;
 
                 PDEVICE_OBJECT pdo = IopGetDeviceObjectFromDeviceInstance(&instancePath);
-                PiQueueDeviceAction(pdo, PiActionAddBootDevices, NULL, NULL);
-                ObDereferenceObject(pdo);
-                deviceAdded = TRUE;
+                if (pdo != NULL)
+                {
+                    PiQueueDeviceAction(pdo, PiActionAddBootDevices, NULL, NULL);
+                    ObDereferenceObject(pdo);
+                    deviceAdded = TRUE;
+                }
+                else
+                {
+                    DPRINT1("No device node found matching instance path '%wZ'\n", &instancePath);
+                }
             }
 
             ExFreePool(kvInfo);
@@ -1022,13 +1044,19 @@ IopInitializeBootDrivers(VOID)
 
     /* Get highest group order index */
     IopGroupIndex = PpInitGetGroupOrderIndex(NULL);
-    if (IopGroupIndex == 0xFFFF) ASSERT(FALSE);
+    if (IopGroupIndex == 0xFFFF)
+    {
+        UNIMPLEMENTED_DBGBREAK();
+    }
 
     /* Allocate the group table */
     IopGroupTable = ExAllocatePoolWithTag(PagedPool,
                                           IopGroupIndex * sizeof(LIST_ENTRY),
                                           TAG_IO);
-    if (IopGroupTable == NULL) ASSERT(FALSE);
+    if (IopGroupTable == NULL)
+    {
+        UNIMPLEMENTED_DBGBREAK();
+    }
 
     /* Initialize the group table lists */
     for (i = 0; i < IopGroupIndex; i++) InitializeListHead(&IopGroupTable[i]);
@@ -1185,8 +1213,8 @@ IopInitializeSystemDrivers(VOID)
 
     PiPerformSyncDeviceAction(IopRootDeviceNode->PhysicalDeviceObject, PiActionEnumDeviceTree);
 
-    /* No system drivers on the boot cd */
-    if (KeLoaderBlock->SetupLdrBlock) return; // ExpInTextModeSetup
+    /* HACK: No system drivers on the BootCD */
+    if (KeLoaderBlock->SetupLdrBlock) return;
 
     /* Get the driver list */
     SavedList = DriverList = CmGetSystemDriverList();
@@ -1689,13 +1717,13 @@ try_again:
     if (!NT_SUCCESS(Status))
     {
         /* If it didn't work, then kill the object */
-        DPRINT1("'%wZ' initialization failed, status (0x%08lx)\n", DriverName, Status);
+        DPRINT1("'%wZ' initialization failed, status (0x%08lx)\n", &LocalDriverName, Status);
         ObMakeTemporaryObject(DriverObject);
         ObDereferenceObject(DriverObject);
         return Status;
     }
 
-    // Windows does this fixup - keep it for compatibility
+    /* Windows does this fixup, keep it for compatibility */
     for (i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; i++)
     {
         /*
@@ -1725,7 +1753,8 @@ try_again:
  */
 VOID
 NTAPI
-IoDeleteDriver(IN PDRIVER_OBJECT DriverObject)
+IoDeleteDriver(
+    _In_ PDRIVER_OBJECT DriverObject)
 {
     /* Simply dereference the Object */
     ObDereferenceObject(DriverObject);
@@ -1919,7 +1948,7 @@ IopLoadDriver(
     Status = IopGetRegistryValue(ServiceHandle, L"ImagePath", &kvInfo);
     if (NT_SUCCESS(Status))
     {
-        if (kvInfo->Type != REG_EXPAND_SZ || kvInfo->DataLength == 0)
+        if ((kvInfo->Type != REG_EXPAND_SZ && kvInfo->Type != REG_SZ) || kvInfo->DataLength == 0)
         {
             ExFreePool(kvInfo);
             return STATUS_ILL_FORMED_SERVICE_ENTRY;

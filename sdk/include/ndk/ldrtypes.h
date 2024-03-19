@@ -189,8 +189,8 @@ typedef struct _LDR_ENUM_RESOURCE_INFO
     ULONG_PTR Name;
     ULONG_PTR Language;
     PVOID Data;
-    SIZE_T Size;
-    ULONG_PTR Reserved;
+    ULONG Size;
+    ULONG Reserved;
 } LDR_ENUM_RESOURCE_INFO, *PLDR_ENUM_RESOURCE_INFO;
 
 //
@@ -238,7 +238,7 @@ typedef struct _ALT_RESOURCE_MODULE
 //
 // Callback function for LdrEnumerateLoadedModules
 //
-typedef VOID (NTAPI LDR_ENUM_CALLBACK)(_In_ PLDR_DATA_TABLE_ENTRY ModuleInformation, _In_ PVOID Parameter, _Out_ BOOLEAN *Stop);
+typedef VOID (NTAPI LDR_ENUM_CALLBACK)(_In_ PLDR_DATA_TABLE_ENTRY ModuleInformation, _In_opt_ PVOID Context, _Out_ BOOLEAN *Stop);
 typedef LDR_ENUM_CALLBACK *PLDR_ENUM_CALLBACK;
 
 //

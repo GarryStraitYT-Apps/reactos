@@ -307,8 +307,8 @@ KiInitializePcr(IN ULONG ProcessorNumber,
     Pcr->MinorVersion = PCR_MINOR_VERSION;
 
     /* Set the PCRB Version */
-    Pcr->PrcbData.MajorVersion = 1;
-    Pcr->PrcbData.MinorVersion = 1;
+    Pcr->PrcbData.MajorVersion = PRCB_MAJOR_VERSION;
+    Pcr->PrcbData.MinorVersion = PRCB_MINOR_VERSION;
 
     /* Set the Build Type */
     Pcr->PrcbData.BuildType = 0;
@@ -413,7 +413,7 @@ KiVerifyCpuFeatures(PKPRCB Prcb)
     Cr0 &= ~(CR0_EM | CR0_MP);
     // Enable FPU exceptions.
     Cr0 |= CR0_NE;
-    
+
     __writecr0(Cr0);
 
     // Check for Pentium FPU bug.
@@ -480,20 +480,25 @@ KiInitializeKernel(IN PKPROCESS InitProcess,
     /* Save CPU state */
     KiSaveProcessorControlState(&Prcb->ProcessorState);
 
+#if DBG
+    /* Print applied kernel features/policies and boot CPU features */
+    if (Number == 0)
+        KiReportCpuFeatures();
+#endif
+
     /* Get cache line information for this CPU */
     KiGetCacheInformation();
 
     /* Initialize spinlocks and DPC data */
     KiInitSpinLocks(Prcb, Number);
 
+    /* Set Node Data */
+    Prcb->ParentNode = KeNodeBlock[0];
+    Prcb->ParentNode->ProcessorMask |= Prcb->SetMember;
+
     /* Check if this is the Boot CPU */
     if (!Number)
     {
-        /* Set Node Data */
-        KeNodeBlock[0] = &KiNode0;
-        Prcb->ParentNode = KeNodeBlock[0];
-        KeNodeBlock[0]->ProcessorMask = Prcb->SetMember;
-
         /* Set boot-level flags */
         KeI386CpuType = Prcb->CpuType;
         KeI386CpuStep = Prcb->CpuStep;
@@ -522,7 +527,7 @@ KiInitializeKernel(IN PKPROCESS InitProcess,
         PageDirectory[1] = 0;
         KeInitializeProcess(InitProcess,
                             0,
-                            0xFFFFFFFF,
+                            MAXULONG_PTR,
                             PageDirectory,
                             FALSE);
         InitProcess->QuantumReset = MAXCHAR;
@@ -530,7 +535,7 @@ KiInitializeKernel(IN PKPROCESS InitProcess,
     else
     {
         /* FIXME */
-        DPRINT1("SMP Boot support not yet present\n");
+        DPRINT1("Starting CPU#%u - you are brave\n", Number);
     }
 
     /* Setup the Idle Thread */
@@ -547,7 +552,7 @@ KiInitializeKernel(IN PKPROCESS InitProcess,
     InitThread->State = Running;
     InitThread->Affinity = 1 << Number;
     InitThread->WaitIrql = DISPATCH_LEVEL;
-    InitProcess->ActiveProcessors = 1 << Number;
+    InitProcess->ActiveProcessors |= 1 << Number;
 
     /* HACK for MmUpdatePageDir */
     ((PETHREAD)InitThread)->ThreadsProcess = (PEPROCESS)InitProcess;
@@ -805,6 +810,18 @@ KiSystemStartup(IN PLOADER_PARAMETER_BLOCK LoaderBlock)
     RtlCopyMemory(&Idt[8], &DoubleFaultEntry, sizeof(KIDTENTRY));
 
 AppCpuInit:
+    //TODO: We don't setup IPIs yet so freeze other processors here.
+    if (Cpu)
+    {
+        KeMemoryBarrier();
+        LoaderBlock->Prcb = 0;
+
+        for (;;)
+        {
+            YieldProcessor();
+        }
+    }
+
     /* Loop until we can release the freeze lock */
     do
     {

@@ -128,6 +128,14 @@ IntDesktopObjectParse(IN PVOID ParseObject,
                             (PVOID*)&Desktop);
     if (!NT_SUCCESS(Status)) return Status;
 
+    /* Assign security to the desktop we have created */
+    Status = IntAssignDesktopSecurityOnParse(WinStaObject, Desktop, AccessState);
+    if (!NT_SUCCESS(Status))
+    {
+        ObDereferenceObject(Desktop);
+        return Status;
+    }
+
     /* Initialize the desktop */
     Status = UserInitializeDesktop(Desktop, RemainingName, WinStaObject);
     if (!NT_SUCCESS(Status))
@@ -162,7 +170,7 @@ IntDesktopObjectDelete(
     if (pdesk->spwndMessage)
         co_UserDestroyWindow(pdesk->spwndMessage);
 
-    /* Remove the desktop from the window station's list of associcated desktops */
+    /* Remove the desktop from the window station's list of associated desktops */
     RemoveEntryList(&pdesk->ListEntry);
 
     /* Free the heap */
@@ -555,6 +563,7 @@ IntResolveDesktop(
     LUID ProcessLuid;
     USHORT StrSize;
     SIZE_T MemSize;
+    PSECURITY_DESCRIPTOR ServiceSD;
     POBJECT_ATTRIBUTES ObjectAttributes = NULL;
     PUNICODE_STRING ObjectName;
     UNICODE_STRING WinStaName, DesktopName;
@@ -1013,15 +1022,27 @@ IntResolveDesktop(
             ObjectName->Length = (USHORT)(wcslen(ObjectName->Buffer) * sizeof(WCHAR));
 
             /*
+             * Set up a security descriptor for the new service's window station.
+             * A service has an associated window station and desktop. The newly
+             * created window station and desktop will get this security descriptor
+             * if such objects weren't created before.
+             */
+            Status = IntCreateServiceSecurity(&ServiceSD);
+            if (!NT_SUCCESS(Status))
+            {
+                ERR("Failed to create a security descriptor for service window station, Status 0x%08lx\n", Status);
+                goto Quit;
+            }
+
+            /*
              * Create or open the non-interactive window station.
              * NOTE: The non-interactive window station handle is never inheritable.
              */
-            // FIXME: Set security!
             InitializeObjectAttributes(ObjectAttributes,
                                        ObjectName,
                                        OBJ_CASE_INSENSITIVE | OBJ_OPENIF,
                                        NULL,
-                                       NULL);
+                                       ServiceSD);
 
             Status = IntCreateWindowStation(&hWinSta,
                                             ObjectAttributes,
@@ -1029,6 +1050,9 @@ IntResolveDesktop(
                                             KernelMode,
                                             MAXIMUM_ALLOWED,
                                             0, 0, 0, 0, 0);
+
+            IntFreeSecurityBuffer(ServiceSD);
+
             if (!NT_SUCCESS(Status))
             {
                 ASSERT(hWinSta == NULL);
@@ -1054,8 +1078,11 @@ IntResolveDesktop(
             }
             ObjectName->Length = (USHORT)(wcslen(ObjectName->Buffer) * sizeof(WCHAR));
 
-            /* NOTE: The non-interactive desktop handle is never inheritable. */
-            // FIXME: Set security!
+            /*
+             * NOTE: The non-interactive desktop handle is never inheritable.
+             * The security descriptor is inherited from the newly created
+             * window station for the desktop.
+             */
             InitializeObjectAttributes(ObjectAttributes,
                                        ObjectName,
                                        OBJ_CASE_INSENSITIVE | OBJ_OPENIF,
@@ -1355,6 +1382,7 @@ HWND FASTCALL IntGetDesktopWindow(VOID)
     return pdo->DesktopWindow;
 }
 
+// Win: _GetDesktopWindow
 PWND FASTCALL UserGetDesktopWindow(VOID)
 {
     PDESKTOP pdo = IntGetActiveDesktop();
@@ -1377,9 +1405,10 @@ HWND FASTCALL IntGetMessageWindow(VOID)
         TRACE("No active desktop\n");
         return NULL;
     }
-    return pdo->spwndMessage->head.h;
+    return UserHMGetHandle(pdo->spwndMessage);
 }
 
+// Win: _GetMessageWindow
 PWND FASTCALL UserGetMessageWindow(VOID)
 {
     PDESKTOP pdo = IntGetActiveDesktop();
@@ -1758,6 +1787,14 @@ BOOL IntDeRegisterShellHookWindow(HWND hWnd)
     PDESKTOP Desktop = pti->rpdesk;
     PLIST_ENTRY ListEntry;
     PSHELL_HOOK_WINDOW Current;
+
+    // FIXME: This probably shouldn't happen, but it does
+    if (Desktop == NULL)
+    {
+        Desktop = IntGetActiveDesktop();
+        if (Desktop == NULL)
+            return FALSE;
+    }
 
     ListEntry = Desktop->ShellHookWindows.Flink;
     while (ListEntry != &Desktop->ShellHookWindows)
@@ -2421,7 +2458,7 @@ IntCreateDesktop(
     }
 
     pdesk->dwSessionId = PsGetCurrentProcessSessionId();
-    pdesk->DesktopWindow = pWnd->head.h;
+    pdesk->DesktopWindow = UserHMGetHandle(pWnd);
     pdesk->pDeskInfo->spwnd = pWnd;
     pWnd->fnid = FNID_DESKTOP;
 
@@ -2498,8 +2535,7 @@ NtUserCreateDesktop(
 {
     NTSTATUS Status;
     HDESK hDesk;
-
-    DECLARE_RETURN(HDESK);
+    HDESK Ret = NULL;
 
     TRACE("Enter NtUserCreateDesktop\n");
     UserEnterExclusive();
@@ -2515,15 +2551,15 @@ NtUserCreateDesktop(
     {
         ERR("IntCreateDesktop failed, Status 0x%08lx\n", Status);
         // SetLastNtError(Status);
-        RETURN(NULL);
+        goto Exit; // Return NULL
     }
 
-    RETURN(hDesk);
+    Ret = hDesk;
 
-CLEANUP:
-    TRACE("Leave NtUserCreateDesktop, ret=0x%p\n", _ret_);
+Exit:
+    TRACE("Leave NtUserCreateDesktop, ret=0x%p\n", Ret);
     UserLeave();
-    END_CLEANUP;
+    return Ret;
 }
 
 /*
@@ -2687,7 +2723,7 @@ NtUserCloseDesktop(HDESK hDesktop)
 {
     PDESKTOP pdesk;
     NTSTATUS Status;
-    DECLARE_RETURN(BOOL);
+    BOOL Ret = FALSE;
 
     TRACE("NtUserCloseDesktop(0x%p) called\n", hDesktop);
     UserEnterExclusive();
@@ -2696,14 +2732,14 @@ NtUserCloseDesktop(HDESK hDesktop)
     {
         ERR("Attempted to close thread desktop\n");
         EngSetLastError(ERROR_BUSY);
-        RETURN(FALSE);
+        goto Exit; // Return FALSE
     }
 
     Status = IntValidateDesktopHandle(hDesktop, UserMode, 0, &pdesk);
     if (!NT_SUCCESS(Status))
     {
         ERR("Validation of desktop handle 0x%p failed\n", hDesktop);
-        RETURN(FALSE);
+        goto Exit; // Return FALSE
     }
 
     ObDereferenceObject(pdesk);
@@ -2713,15 +2749,15 @@ NtUserCloseDesktop(HDESK hDesktop)
     {
         ERR("Failed to close desktop handle 0x%p\n", hDesktop);
         SetLastNtError(Status);
-        RETURN(FALSE);
+        goto Exit; // Return FALSE
     }
 
-    RETURN(TRUE);
+    Ret = TRUE;
 
-CLEANUP:
-    TRACE("Leave NtUserCloseDesktop, ret=%i\n", _ret_);
+Exit:
+    TRACE("Leave NtUserCloseDesktop, ret=%i\n", Ret);
     UserLeave();
-    END_CLEANUP;
+    return Ret;
 }
 
 /*
@@ -2902,7 +2938,7 @@ NtUserSwitchDesktop(HDESK hdesk)
     PDESKTOP pdesk;
     NTSTATUS Status;
     BOOL bRedrawDesktop;
-    DECLARE_RETURN(BOOL);
+    BOOL Ret = FALSE;
 
     UserEnterExclusive();
     TRACE("Enter NtUserSwitchDesktop(0x%p)\n", hdesk);
@@ -2911,21 +2947,22 @@ NtUserSwitchDesktop(HDESK hdesk)
     if (!NT_SUCCESS(Status))
     {
         ERR("Validation of desktop handle 0x%p failed\n", hdesk);
-        RETURN(FALSE);
+        goto Exit; // Return FALSE
     }
 
     if (PsGetCurrentProcessSessionId() != pdesk->rpwinstaParent->dwSessionId)
     {
         ObDereferenceObject(pdesk);
         ERR("NtUserSwitchDesktop called for a desktop of a different session\n");
-        RETURN(FALSE);
+        goto Exit; // Return FALSE
     }
 
     if (pdesk == gpdeskInputDesktop)
     {
         ObDereferenceObject(pdesk);
         WARN("NtUserSwitchDesktop called for active desktop\n");
-        RETURN(TRUE);
+        Ret = TRUE;
+        goto Exit;
     }
 
     /*
@@ -2937,14 +2974,14 @@ NtUserSwitchDesktop(HDESK hdesk)
     {
         ObDereferenceObject(pdesk);
         ERR("Switching desktop 0x%p denied because the window station is locked!\n", hdesk);
-        RETURN(FALSE);
+        goto Exit; // Return FALSE
     }
 
     if (pdesk->rpwinstaParent != InputWindowStation)
     {
         ObDereferenceObject(pdesk);
         ERR("Switching desktop 0x%p denied because desktop doesn't belong to the interactive winsta!\n", hdesk);
-        RETURN(FALSE);
+        goto Exit; // Return FALSE
     }
 
     /* FIXME: Fail if the process is associated with a secured
@@ -2977,12 +3014,12 @@ NtUserSwitchDesktop(HDESK hdesk)
     TRACE("SwitchDesktop gpdeskInputDesktop 0x%p\n", gpdeskInputDesktop);
     ObDereferenceObject(pdesk);
 
-    RETURN(TRUE);
+    Ret = TRUE;
 
-CLEANUP:
-    TRACE("Leave NtUserSwitchDesktop, ret=%i\n", _ret_);
+Exit:
+    TRACE("Leave NtUserSwitchDesktop, ret=%i\n", Ret);
     UserLeave();
-    END_CLEANUP;
+    return Ret;
 }
 
 /*

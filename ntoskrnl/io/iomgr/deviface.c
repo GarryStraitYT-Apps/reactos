@@ -6,7 +6,7 @@
  *
  * PROGRAMMERS:     Filip Navara (xnavara@volny.cz)
  *                  Matthew Brace (ismarc@austin.rr.com)
- *                  Hervé Poussineau (hpoussin@reactos.org)
+ *                  HervÃ© Poussineau (hpoussin@reactos.org)
  */
 
 /* INCLUDES ******************************************************************/
@@ -1060,7 +1060,7 @@ IoRegisterDeviceInterface(IN PDEVICE_OBJECT PhysicalDeviceObject,
         &ObjectAttributes,
         0, /* TileIndex */
         NULL, /* Class */
-        REG_OPTION_VOLATILE,
+        REG_OPTION_NON_VOLATILE,
         NULL); /* Disposition */
 
     if (!NT_SUCCESS(Status))
@@ -1111,7 +1111,7 @@ IoRegisterDeviceInterface(IN PDEVICE_OBJECT PhysicalDeviceObject,
         &ObjectAttributes,
         0, /* TileIndex */
         NULL, /* Class */
-        REG_OPTION_VOLATILE,
+        REG_OPTION_NON_VOLATILE,
         NULL); /* Disposition */
 
     if (!NT_SUCCESS(Status))
@@ -1175,7 +1175,7 @@ IoRegisterDeviceInterface(IN PDEVICE_OBJECT PhysicalDeviceObject,
         &ObjectAttributes,
         0, /* TileIndex */
         NULL, /* Class */
-        REG_OPTION_VOLATILE,
+        REG_OPTION_NON_VOLATILE,
         NULL); /* Disposition */
 
     if (!NT_SUCCESS(Status))
@@ -1465,6 +1465,7 @@ IoSetDeviceInterfaceState(IN PUNICODE_STRING SymbolicLinkName,
     EventGuid = Enable ? &GUID_DEVICE_INTERFACE_ARRIVAL : &GUID_DEVICE_INTERFACE_REMOVAL;
 
     PiNotifyDeviceInterfaceChange(EventGuid, &DeviceGuid, SymbolicLinkName);
+    IopQueueDeviceChangeEvent(EventGuid, &DeviceGuid, SymbolicLinkName);
 
     ObDereferenceObject(PhysicalDeviceObject);
     DPRINT("Status %x\n", Status);

@@ -4,8 +4,12 @@
 #include <apitest.h>
 
 extern void func_LdrEnumResources(void);
+extern void func_LdrLoadDll(void);
 extern void func_load_notifications(void);
 extern void func_NtAcceptConnectPort(void);
+extern void func_NtAccessCheck(void);
+extern void func_NtAccessCheckByType(void);
+extern void func_NtAccessCheckByTypeResultList(void);
 extern void func_NtAdjustGroupsToken(void);
 extern void func_NtAdjustPrivilegesToken(void);
 extern void func_NtAllocateVirtualMemory(void);
@@ -31,16 +35,20 @@ extern void func_NtProtectVirtualMemory(void);
 extern void func_NtQueryInformationFile(void);
 extern void func_NtQueryInformationProcess(void);
 extern void func_NtQueryInformationThread(void);
+extern void func_NtQueryInformationToken(void);
 extern void func_NtQueryKey(void);
+extern void func_NtQueryOpenSubKeys(void);
 extern void func_NtQuerySystemEnvironmentValue(void);
 extern void func_NtQuerySystemInformation(void);
 extern void func_NtQueryValueKey(void);
 extern void func_NtQueryVolumeInformationFile(void);
 extern void func_NtReadFile(void);
 extern void func_NtSaveKey(void);
+extern void func_NtSetDefaultLocale(void);
 extern void func_NtSetInformationFile(void);
 extern void func_NtSetInformationProcess(void);
 extern void func_NtSetInformationThread(void);
+extern void func_NtSetInformationToken(void);
 extern void func_NtSetValueKey(void);
 extern void func_NtSetVolumeInformationFile(void);
 extern void func_NtSystemInformation(void);
@@ -48,8 +56,10 @@ extern void func_NtUnloadDriver(void);
 extern void func_NtWriteFile(void);
 extern void func_RtlAllocateHeap(void);
 extern void func_RtlBitmap(void);
+extern void func_RtlCaptureContext(void);
 extern void func_RtlComputePrivatizedDllName_U(void);
 extern void func_RtlCopyMappedMemory(void);
+extern void func_RtlCriticalSection(void);
 extern void func_RtlDebugInformation(void);
 extern void func_RtlDeleteAce(void);
 extern void func_RtlDetermineDosPathNameType(void);
@@ -67,10 +77,12 @@ extern void func_RtlGetLengthWithoutLastFullDosOrNtPathElement(void);
 extern void func_RtlGetLengthWithoutTrailingPathSeperators(void);
 extern void func_RtlGetLongestNtPathLength(void);
 extern void func_RtlGetNtProductType(void);
+extern void func_RtlGetProcessHeaps(void);
 extern void func_RtlGetUnloadEventTrace(void);
 extern void func_RtlHandle(void);
 extern void func_RtlImageDirectoryEntryToData(void);
 extern void func_RtlImageRvaToVa(void);
+extern void func_RtlIntSafe(void);
 extern void func_RtlIsNameLegalDOS8Dot3(void);
 extern void func_RtlMemoryStream(void);
 extern void func_RtlMultipleAllocateHeap(void);
@@ -79,21 +91,28 @@ extern void func_RtlpApplyLengthFunction(void);
 extern void func_RtlpEnsureBufferSize(void);
 extern void func_RtlQueryTimeZoneInformation(void);
 extern void func_RtlReAllocateHeap(void);
+extern void func_RtlRemovePrivileges(void);
 extern void func_RtlUnicodeStringToAnsiString(void);
 extern void func_RtlUnicodeStringToCountedOemString(void);
 extern void func_RtlUnicodeToOemN(void);
+extern void func_RtlUnwind(void);
 extern void func_RtlUpcaseUnicodeStringToCountedOemString(void);
 extern void func_RtlValidateUnicodeString(void);
 extern void func_RtlxUnicodeStringToAnsiSize(void);
 extern void func_RtlxUnicodeStringToOemSize(void);
 extern void func_StackOverflow(void);
 extern void func_TimerResolution(void);
+extern void func_UserModeException(void);
 
 const struct test winetest_testlist[] =
 {
     { "LdrEnumResources",               func_LdrEnumResources },
+    { "LdrLoadDll",                     func_LdrLoadDll },
     { "load_notifications",             func_load_notifications },
     { "NtAcceptConnectPort",            func_NtAcceptConnectPort },
+    { "NtAccessCheck",                  func_NtAccessCheck },
+    { "NtAccessCheckByType",            func_NtAccessCheckByType },
+    { "NtAccessCheckByTypeResultList",  func_NtAccessCheckByTypeResultList },
     { "NtAdjustGroupsToken",            func_NtAdjustGroupsToken },
     { "NtAdjustPrivilegesToken",        func_NtAdjustPrivilegesToken },
     { "NtAllocateVirtualMemory",        func_NtAllocateVirtualMemory },
@@ -119,16 +138,20 @@ const struct test winetest_testlist[] =
     { "NtQueryInformationFile",         func_NtQueryInformationFile },
     { "NtQueryInformationProcess",      func_NtQueryInformationProcess },
     { "NtQueryInformationThread",       func_NtQueryInformationThread },
+    { "NtQueryInformationToken",        func_NtQueryInformationToken },
     { "NtQueryKey",                     func_NtQueryKey },
+    { "NtQueryOpenSubKeys",             func_NtQueryOpenSubKeys },
     { "NtQuerySystemEnvironmentValue",  func_NtQuerySystemEnvironmentValue },
     { "NtQuerySystemInformation",       func_NtQuerySystemInformation },
     { "NtQueryValueKey",                func_NtQueryValueKey },
     { "NtQueryVolumeInformationFile",   func_NtQueryVolumeInformationFile },
     { "NtReadFile",                     func_NtReadFile },
     { "NtSaveKey",                      func_NtSaveKey},
+    { "NtSetDefaultLocale",             func_NtSetDefaultLocale },
     { "NtSetInformationFile",           func_NtSetInformationFile },
     { "NtSetInformationProcess",        func_NtSetInformationProcess },
     { "NtSetInformationThread",         func_NtSetInformationThread },
+    { "NtSetInformationToken",          func_NtSetInformationToken },
     { "NtSetValueKey",                  func_NtSetValueKey},
     { "NtSetVolumeInformationFile",     func_NtSetVolumeInformationFile },
     { "NtSystemInformation",            func_NtSystemInformation },
@@ -138,6 +161,7 @@ const struct test winetest_testlist[] =
     { "RtlBitmapApi",                   func_RtlBitmap },
     { "RtlComputePrivatizedDllName_U",  func_RtlComputePrivatizedDllName_U },
     { "RtlCopyMappedMemory",            func_RtlCopyMappedMemory },
+    { "RtlCriticalSection",             func_RtlCriticalSection },
     { "RtlDebugInformation",            func_RtlDebugInformation },
     { "RtlDeleteAce",                   func_RtlDeleteAce },
     { "RtlDetermineDosPathNameType",    func_RtlDetermineDosPathNameType },
@@ -155,10 +179,12 @@ const struct test winetest_testlist[] =
     { "RtlGetLengthWithoutTrailingPathSeperators", func_RtlGetLengthWithoutTrailingPathSeperators },
     { "RtlGetLongestNtPathLength",      func_RtlGetLongestNtPathLength },
     { "RtlGetNtProductType",            func_RtlGetNtProductType },
+    { "RtlGetProcessHeaps",             func_RtlGetProcessHeaps },
     { "RtlGetUnloadEventTrace",         func_RtlGetUnloadEventTrace },
     { "RtlHandle",                      func_RtlHandle },
     { "RtlImageDirectoryEntryToData",   func_RtlImageDirectoryEntryToData },
     { "RtlImageRvaToVa",                func_RtlImageRvaToVa },
+    { "RtlIntSafe",                     func_RtlIntSafe },
     { "RtlIsNameLegalDOS8Dot3",         func_RtlIsNameLegalDOS8Dot3 },
     { "RtlMemoryStream",                func_RtlMemoryStream },
     { "RtlMultipleAllocateHeap",        func_RtlMultipleAllocateHeap },
@@ -167,6 +193,7 @@ const struct test winetest_testlist[] =
     { "RtlpEnsureBufferSize",           func_RtlpEnsureBufferSize },
     { "RtlQueryTimeZoneInformation",    func_RtlQueryTimeZoneInformation },
     { "RtlReAllocateHeap",              func_RtlReAllocateHeap },
+    { "RtlRemovePrivileges",            func_RtlRemovePrivileges },
     { "RtlUnicodeStringToAnsiSize",     func_RtlxUnicodeStringToAnsiSize }, /* For some reason, starting test name with Rtlx hides it */
     { "RtlUnicodeStringToAnsiString",   func_RtlUnicodeStringToAnsiString },
     { "RtlUnicodeStringToCountedOemString", func_RtlUnicodeStringToCountedOemString },
@@ -176,6 +203,13 @@ const struct test winetest_testlist[] =
     { "RtlValidateUnicodeString",       func_RtlValidateUnicodeString },
     { "StackOverflow",                  func_StackOverflow },
     { "TimerResolution",                func_TimerResolution },
+    { "UserModeException",              func_UserModeException },
+#ifdef _M_IX86
+    { "RtlUnwind",                      func_RtlUnwind },
+#endif
+#ifdef _M_AMD64
+    { "RtlCaptureContext",              func_RtlCaptureContext },
+#endif
 
     { 0, 0 }
 };

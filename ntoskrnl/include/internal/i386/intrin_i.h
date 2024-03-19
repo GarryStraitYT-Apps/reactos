@@ -5,6 +5,82 @@ extern "C"
 {
 #endif
 
+FORCEINLINE
+PKGDTENTRY
+KiGetGdtEntry(
+    _In_ PVOID pGdt,
+    _In_ USHORT Selector)
+{
+    return (PKGDTENTRY)((ULONG_PTR)pGdt + (Selector & ~RPL_MASK));
+}
+
+FORCEINLINE
+VOID
+KiSetGdtDescriptorBase(
+    _Inout_ PKGDTENTRY Entry,
+    _In_ ULONG32 Base)
+{
+    Entry->BaseLow = (USHORT)(Base & 0xffff);
+    Entry->HighWord.Bytes.BaseMid = (UCHAR)((Base >> 16) & 0xff);
+    Entry->HighWord.Bytes.BaseHi  = (UCHAR)((Base >> 24) & 0xff);
+    // Entry->BaseUpper = (ULONG)(Base >> 32);
+}
+
+FORCEINLINE
+VOID
+KiSetGdtDescriptorLimit(
+    _Inout_ PKGDTENTRY Entry,
+    _In_ ULONG Limit)
+{
+    if (Limit < 0x100000)
+    {
+        Entry->HighWord.Bits.Granularity = 0;
+    }
+    else
+    {
+        Limit >>= 12;
+        Entry->HighWord.Bits.Granularity = 1;
+    }
+    Entry->LimitLow = (USHORT)(Limit & 0xffff);
+    Entry->HighWord.Bits.LimitHi = ((Limit >> 16) & 0x0f);
+}
+
+FORCEINLINE
+VOID
+KiSetGdtEntryEx(
+    _Inout_ PKGDTENTRY Entry,
+    _In_ ULONG32 Base,
+    _In_ ULONG Limit,
+    _In_ UCHAR Type,
+    _In_ UCHAR Dpl,
+    _In_ BOOLEAN Granularity,
+    _In_ UCHAR SegMode) // 0: 16-bit, 1: 32-bit, 2: 64-bit
+{
+    KiSetGdtDescriptorBase(Entry, Base);
+    KiSetGdtDescriptorLimit(Entry, Limit);
+    Entry->HighWord.Bits.Type = (Type & 0x1f);
+    Entry->HighWord.Bits.Dpl  = (Dpl & 0x3);
+    Entry->HighWord.Bits.Pres = (Type != 0); // Present, must be 1 when the GDT entry is valid.
+    Entry->HighWord.Bits.Sys  = 0;           // System
+    Entry->HighWord.Bits.Reserved_0  = 0;    // LongMode = !!(SegMode & 1);
+    Entry->HighWord.Bits.Default_Big = !!(SegMode & 2);
+    Entry->HighWord.Bits.Granularity |= !!Granularity; // The flag may have been already set by KiSetGdtDescriptorLimit().
+    // Entry->MustBeZero = 0;
+}
+
+FORCEINLINE
+VOID
+KiSetGdtEntry(
+    _Inout_ PKGDTENTRY Entry,
+    _In_ ULONG32 Base,
+    _In_ ULONG Limit,
+    _In_ UCHAR Type,
+    _In_ UCHAR Dpl,
+    _In_ UCHAR SegMode) // 0: 16-bit, 1: 32-bit, 2: 64-bit
+{
+    KiSetGdtEntryEx(Entry, Base, Limit, Type, Dpl, FALSE, SegMode);
+}
+
 #if defined(__GNUC__)
 
 FORCEINLINE
@@ -45,7 +121,6 @@ Ke386FxSave(IN PFX_SAVE_AREA SaveArea)
     asm volatile ("fxsave (%0)" : : "r"(SaveArea));
 }
 
-
 FORCEINLINE
 VOID
 Ke386FnSave(IN PFLOATING_SAVE_AREA SaveArea)
@@ -66,6 +141,28 @@ Ke386SaveFpuState(IN PFX_SAVE_AREA SaveArea)
     {
         __asm__ __volatile__ ("fnsave %0\n wait\n" : : "m"(*SaveArea));
     }
+}
+
+FORCEINLINE
+VOID
+Ke386RestoreFpuState(_In_ PFX_SAVE_AREA SaveArea)
+{
+    extern ULONG KeI386FxsrPresent;
+    if (KeI386FxsrPresent)
+    {
+        __asm__ __volatile__ ("fxrstor %0\n" : : "m"(*SaveArea));
+    }
+    else
+    {
+        __asm__ __volatile__ ("frstor %0\n\t" : "=m" (*SaveArea));
+    }
+}
+
+FORCEINLINE
+VOID
+Ke386ClearFpExceptions(VOID)
+{
+    __asm__ __volatile__ ("fnclex");
 }
 
 FORCEINLINE
@@ -161,6 +258,14 @@ __fxrstor(IN PFX_SAVE_AREA SaveArea)
 {
     __asm mov eax, SaveArea
     __asm fxrstor [eax]
+}
+
+FORCEINLINE
+VOID
+__frstor(_In_ PFX_SAVE_AREA SaveArea)
+{
+    __asm mov eax, SaveArea
+    __asm frstor [eax]
 }
 
 FORCEINLINE
@@ -314,16 +419,35 @@ Ke386SaveFpuState(IN PVOID SaveArea)
     }
 }
 
+FORCEINLINE
+VOID
+Ke386RestoreFpuState(_In_ PVOID SaveArea)
+{
+    if (KeI386FxsrPresent)
+    {
+        __fxrstor((PFX_SAVE_AREA)SaveArea);
+    }
+    else
+    {
+        __frstor((PFX_SAVE_AREA)SaveArea);
+    }
+}
+
+FORCEINLINE
+VOID
+Ke386ClearFpExceptions(VOID)
+{
+    __asm fnclex;
+}
+
 #define Ke386FnSave __fnsave
 #define Ke386FxSave __fxsave
 // The name suggest, that the original author didn't understand what frstor means
 #define Ke386FxStore __fxrstor
 
-
 #else
 #error Unknown compiler for inline assembler
 #endif
-
 
 #define Ke386GetGlobalDescriptorTable __sgdt
 #define Ke386SetGlobalDescriptorTable __lgdt
@@ -332,6 +456,5 @@ Ke386SaveFpuState(IN PVOID SaveArea)
 #ifdef __cplusplus
 } // extern "C"
 #endif
-
 
 /* EOF */

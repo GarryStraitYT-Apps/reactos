@@ -39,7 +39,11 @@ if(STACK_PROTECTOR)
 endif()
 
 # Compiler Core
-add_compile_options(-pipe -fms-extensions -fno-strict-aliasing)
+# note: -fno-common is default since GCC 10
+add_compile_options(-pipe -fms-extensions -fno-strict-aliasing -fno-common)
+
+# A long double is 64 bits
+add_compile_options(-mlong-double-64)
 
 # Prevent GCC from searching any of the default directories.
 # The case for C++ is handled through the reactos_c++ INTERFACE library
@@ -54,7 +58,6 @@ elseif(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     add_compile_options("$<$<COMPILE_LANGUAGE:C>:-Wno-microsoft>")
     add_compile_options(-Wno-pragma-pack)
     add_compile_options(-fno-associative-math)
-    add_compile_options(-fcommon)
 
     if(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 12.0)
         # disable "libcall optimization"
@@ -160,6 +163,7 @@ endif()
 
 # Other
 if(ARCH STREQUAL "amd64")
+    add_compile_options(-mcx16) # Generate CMPXCHG16
     add_definitions(-U_X86_ -UWIN32)
 elseif(ARCH STREQUAL "arm")
     add_definitions(-U_UNICODE -UUNICODE)
@@ -344,11 +348,11 @@ function(fixup_load_config _target)
         DEPENDS native-pefixup)
 endfunction()
 
-function(generate_import_lib _libname _dllname _spec_file)
+function(generate_import_lib _libname _dllname _spec_file __version_arg)
     # Generate the def for the import lib
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${_libname}_implib.def
-        COMMAND native-spec2def -n=${_dllname} -a=${ARCH2} ${ARGN} --implib -d=${CMAKE_CURRENT_BINARY_DIR}/${_libname}_implib.def ${CMAKE_CURRENT_SOURCE_DIR}/${_spec_file}
+        COMMAND native-spec2def ${__version_arg} -n=${_dllname} -a=${ARCH2} ${ARGN} --implib -d=${CMAKE_CURRENT_BINARY_DIR}/${_libname}_implib.def ${CMAKE_CURRENT_SOURCE_DIR}/${_spec_file}
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${_spec_file} native-spec2def)
 
     # With this, we let DLLTOOL create an import library
@@ -414,6 +418,8 @@ function(spec2def _dllname _spec_file)
 
     if(__spec2def_VERSION)
         set(__version_arg "--version=0x${__spec2def_VERSION}")
+    else()
+        set(__version_arg "--version=${DLL_EXPORT_VERSION}")
     endif()
 
     # Generate exports def and C stubs file for the DLL
@@ -422,13 +428,16 @@ function(spec2def _dllname _spec_file)
         COMMAND native-spec2def -n=${_dllname} -a=${ARCH2} -d=${CMAKE_CURRENT_BINARY_DIR}/${_file}.def -s=${CMAKE_CURRENT_BINARY_DIR}/${_file}_stubs.c ${__with_relay_arg} ${__version_arg} ${CMAKE_CURRENT_SOURCE_DIR}/${_spec_file}
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${_spec_file} native-spec2def)
 
+    # Do not use precompiled headers for the stub file
+    set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/${_file}_stubs.c PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+
     if(__spec2def_ADD_IMPORTLIB)
         set(_extraflags)
         if(__spec2def_NO_PRIVATE_WARNINGS)
             set(_extraflags --no-private-warnings)
         endif()
 
-        generate_import_lib(lib${_file} ${_dllname} ${_spec_file} ${_extraflags})
+        generate_import_lib(lib${_file} ${_dllname} ${_spec_file} ${_extraflags} "${__version_arg}")
     endif()
 endfunction()
 
@@ -466,8 +475,37 @@ function(allow_warnings __module)
     #target_compile_options(${__module} PRIVATE "-Wno-error")
 endfunction()
 
+function(convert_asm_file _source_file _target_file)
+    get_filename_component(_source_file_base_name ${_source_file} NAME_WE)
+    get_filename_component(_source_file_full_path ${_source_file} ABSOLUTE)
+    set(_preprocessed_asm_file ${CMAKE_CURRENT_BINARY_DIR}/${_target_file})
+    add_custom_command(
+        OUTPUT ${_preprocessed_asm_file}
+        COMMAND native-asmpp ${_source_file_full_path} > ${_preprocessed_asm_file}
+        DEPENDS native-asmpp ${_source_file_full_path})
+
+endfunction()
+
+function(convert_asm_files)
+    foreach(_source_file ${ARGN})
+        convert_asm_file(${_source_file} ${_source_file}.s)
+    endforeach()
+endfunction()
+
 macro(add_asm_files _target)
-    list(APPEND ${_target} ${ARGN})
+    foreach(_source_file ${ARGN})
+        get_filename_component(_extension ${_source_file} EXT)
+        get_filename_component(_source_file_base_name ${_source_file} NAME_WE)
+        if (${_extension} STREQUAL ".asm")
+            convert_asm_file(${_source_file} ${_source_file}.s)
+            list(APPEND ${_target} ${CMAKE_CURRENT_BINARY_DIR}/${_source_file}.s)
+        elseif (${_extension} STREQUAL ".inc")
+            convert_asm_file(${_source_file} ${_source_file}.h)
+            list(APPEND ${_target} ${CMAKE_CURRENT_BINARY_DIR}/${_source_file}.h)
+        else()
+            list(APPEND ${_target} ${_source_file})
+        endif()
+    endforeach()
 endmacro()
 
 function(add_linker_script _target _linker_script_file)
@@ -485,12 +523,12 @@ add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:$<IF:$<BOOL:$<TARGET_PROPERTY:WIT
 add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:$<IF:$<BOOL:$<TARGET_PROPERTY:WITH_CXX_EXCEPTIONS>>,-fexceptions,-fno-exceptions>>")
 
 # G++ shipped with ROSBE uses sjlj exceptions on i386. Tell Clang it is so
-if (CLANG AND (ARCH STREQUAL "i386"))
+if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND ARCH STREQUAL "i386")
     add_compile_options("$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<BOOL:$<TARGET_PROPERTY:WITH_CXX_EXCEPTIONS>>>:-fsjlj-exceptions>")
 endif()
 
 # Find default G++ libraries
-if (CLANG)
+if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     set(GXX_EXECUTABLE ${CMAKE_CXX_COMPILER_TARGET}-g++)
 else()
     set(GXX_EXECUTABLE ${CMAKE_CXX_COMPILER})

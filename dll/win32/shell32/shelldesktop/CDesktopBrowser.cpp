@@ -55,26 +55,26 @@ public:
     HRESULT Initialize(IShellDesktopTray *ShellDeskx);
 
     // *** IOleWindow methods ***
-    virtual HRESULT STDMETHODCALLTYPE GetWindow(HWND *lphwnd);
-    virtual HRESULT STDMETHODCALLTYPE ContextSensitiveHelp(BOOL fEnterMode);
+    STDMETHOD(GetWindow)(HWND *lphwnd) override;
+    STDMETHOD(ContextSensitiveHelp)(BOOL fEnterMode) override;
 
     // *** IShellBrowser methods ***
-    virtual HRESULT STDMETHODCALLTYPE InsertMenusSB(HMENU hmenuShared, LPOLEMENUGROUPWIDTHS lpMenuWidths);
-    virtual HRESULT STDMETHODCALLTYPE SetMenuSB(HMENU hmenuShared, HOLEMENU holemenuRes, HWND hwndActiveObject);
-    virtual HRESULT STDMETHODCALLTYPE RemoveMenusSB(HMENU hmenuShared);
-    virtual HRESULT STDMETHODCALLTYPE SetStatusTextSB(LPCOLESTR pszStatusText);
-    virtual HRESULT STDMETHODCALLTYPE EnableModelessSB(BOOL fEnable);
-    virtual HRESULT STDMETHODCALLTYPE TranslateAcceleratorSB(MSG *pmsg, WORD wID);
-    virtual HRESULT STDMETHODCALLTYPE BrowseObject(LPCITEMIDLIST pidl, UINT wFlags);
-    virtual HRESULT STDMETHODCALLTYPE GetViewStateStream(DWORD grfMode, IStream **ppStrm);
-    virtual HRESULT STDMETHODCALLTYPE GetControlWindow(UINT id, HWND *lphwnd);
-    virtual HRESULT STDMETHODCALLTYPE SendControlMsg(UINT id, UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT *pret);
-    virtual HRESULT STDMETHODCALLTYPE QueryActiveShellView(struct IShellView **ppshv);
-    virtual HRESULT STDMETHODCALLTYPE OnViewWindowActive(struct IShellView *ppshv);
-    virtual HRESULT STDMETHODCALLTYPE SetToolbarItems(LPTBBUTTON lpButtons, UINT nButtons, UINT uFlags);
+    STDMETHOD(InsertMenusSB)(HMENU hmenuShared, LPOLEMENUGROUPWIDTHS lpMenuWidths) override;
+    STDMETHOD(SetMenuSB)(HMENU hmenuShared, HOLEMENU holemenuRes, HWND hwndActiveObject) override;
+    STDMETHOD(RemoveMenusSB)(HMENU hmenuShared) override;
+    STDMETHOD(SetStatusTextSB)(LPCOLESTR pszStatusText) override;
+    STDMETHOD(EnableModelessSB)(BOOL fEnable) override;
+    STDMETHOD(TranslateAcceleratorSB)(MSG *pmsg, WORD wID) override;
+    STDMETHOD(BrowseObject)(LPCITEMIDLIST pidl, UINT wFlags) override;
+    STDMETHOD(GetViewStateStream)(DWORD grfMode, IStream **ppStrm) override;
+    STDMETHOD(GetControlWindow)(UINT id, HWND *lphwnd) override;
+    STDMETHOD(SendControlMsg)(UINT id, UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT *pret) override;
+    STDMETHOD(QueryActiveShellView)(struct IShellView **ppshv) override;
+    STDMETHOD(OnViewWindowActive)(struct IShellView *ppshv) override;
+    STDMETHOD(SetToolbarItems)(LPTBBUTTON lpButtons, UINT nButtons, UINT uFlags) override;
 
     // *** IServiceProvider methods ***
-    virtual HRESULT STDMETHODCALLTYPE QueryService(REFGUID guidService, REFIID riid, void **ppvObject);
+    STDMETHOD(QueryService)(REFGUID guidService, REFIID riid, void **ppvObject) override;
 
     // message handlers
     LRESULT OnEraseBkgnd(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled);
@@ -321,8 +321,8 @@ HRESULT STDMETHODCALLTYPE CDesktopBrowser::QueryActiveShellView(IShellView **pps
     if (ppshv == NULL)
         return E_POINTER;
     *ppshv = m_ShellView;
-    if (m_ShellView != NULL)
-        m_ShellView->AddRef();
+    if (*ppshv != NULL)
+        (*ppshv)->AddRef();
 
     return S_OK;
 }
@@ -519,4 +519,34 @@ BOOL WINAPI SHDesktopMessageLoop(HANDLE hDesktop)
     }
 
     return TRUE;
+}
+
+/*************************************************************************
+ *  SHIsTempDisplayMode [SHELL32.724]
+ *
+ * Is the current display settings temporary?
+ */
+EXTERN_C BOOL WINAPI SHIsTempDisplayMode(VOID)
+{
+    TRACE("\n");
+
+    if (GetSystemMetrics(SM_REMOTESESSION) || GetSystemMetrics(SM_REMOTECONTROL))
+        return FALSE;
+
+    DEVMODEW DevMode;
+    ZeroMemory(&DevMode, sizeof(DevMode));
+    DevMode.dmSize = sizeof(DevMode);
+
+    if (!EnumDisplaySettingsW(NULL, ENUM_REGISTRY_SETTINGS, &DevMode))
+        return FALSE;
+
+    if (!DevMode.dmPelsWidth || !DevMode.dmPelsHeight)
+        return FALSE;
+
+    HDC hDC = GetDC(NULL);
+    DWORD cxWidth = GetDeviceCaps(hDC, HORZRES);
+    DWORD cyHeight = GetDeviceCaps(hDC, VERTRES);
+    ReleaseDC(NULL, hDC);
+
+    return (cxWidth != DevMode.dmPelsWidth || cyHeight != DevMode.dmPelsHeight);
 }

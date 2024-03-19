@@ -35,6 +35,7 @@ _scwprintf(
 
 /*
  * Test the Thread to verify and validate it. Hard to the core tests are required.
+ * Win: PtiFromThreadId
  */
 PTHREADINFO
 FASTCALL
@@ -75,19 +76,27 @@ IntTID2PTI(HANDLE id)
    return pti;
 }
 
+/**
+ * @see https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-2000-server/cc976564%28v=technet.10%29
+ */
 DWORD
 FASTCALL
-UserGetLanguageToggle(VOID)
+UserGetLanguageToggle(
+    _In_ PCWSTR pszType,
+    _In_ DWORD dwDefaultValue)
 {
     NTSTATUS Status;
-    DWORD dwValue = 0;
+    DWORD dwValue = dwDefaultValue;
+    WCHAR szBuff[4];
 
-    Status = RegReadUserSetting(L"Keyboard Layout\\Toggle", L"Layout Hotkey", REG_SZ, &dwValue, sizeof(dwValue));
+    Status = RegReadUserSetting(L"Keyboard Layout\\Toggle", pszType, REG_SZ, szBuff, sizeof(szBuff));
     if (NT_SUCCESS(Status))
     {
-        dwValue = atoi((char *)&dwValue);
-        TRACE("Layout Hotkey %d\n",dwValue);
+        szBuff[RTL_NUMBER_OF(szBuff) - 1] = UNICODE_NULL;
+        dwValue = _wtoi(szBuff);
     }
+
+    TRACE("%ls: %lu\n", pszType, dwValue);
     return dwValue;
 }
 
@@ -334,8 +343,8 @@ NtUserGetThreadState(
       case THREADSTATE_ISWINLOGON2:
          ret = (gpidLogon == PsGetCurrentProcessId());
          break;
-      case THREADSTATE_UNKNOWN17:
-         /* FIXME */
+      case THREADSTATE_CHECKCONIME:
+         ret = (IntTID2PTI(UlongToHandle(pti->rpdesk->dwConsoleThreadId)) == pti);
          break;
    }
 
@@ -401,8 +410,7 @@ NtUserGetGUIThreadInfo(
    PDESKTOP Desktop;
    PUSER_MESSAGE_QUEUE MsgQueue;
    PTHREADINFO W32Thread, pti;
-
-   DECLARE_RETURN(BOOLEAN);
+   BOOL Ret = FALSE;
 
    TRACE("Enter NtUserGetGUIThreadInfo\n");
    UserEnterShared();
@@ -411,13 +419,13 @@ NtUserGetGUIThreadInfo(
    if(!NT_SUCCESS(Status))
    {
       SetLastNtError(Status);
-      RETURN( FALSE);
+      goto Exit; // Return FALSE
    }
 
    if(SafeGui.cbSize != sizeof(GUITHREADINFO))
    {
       EngSetLastError(ERROR_INVALID_PARAMETER);
-      RETURN( FALSE);
+      goto Exit; // Return FALSE
    }
 
    if (idThread)
@@ -430,7 +438,7 @@ NtUserGetGUIThreadInfo(
       if ( !W32Thread )
       {
           EngSetLastError(ERROR_ACCESS_DENIED);
-          RETURN( FALSE);
+          goto Exit; // Return FALSE
       }
 
       Desktop = W32Thread->rpdesk;
@@ -439,7 +447,7 @@ NtUserGetGUIThreadInfo(
       if ( !Desktop || Desktop != pti->rpdesk )
       {
           EngSetLastError(ERROR_ACCESS_DENIED);
-          RETURN( FALSE);
+          goto Exit; // Return FALSE
       }
 
       if ( W32Thread->MessageQueue )
@@ -456,7 +464,7 @@ NtUserGetGUIThreadInfo(
       if(!MsgQueue)
       {
         EngSetLastError(ERROR_ACCESS_DENIED);
-        RETURN( FALSE);
+        goto Exit; // Return FALSE
       }
    }
 
@@ -509,15 +517,15 @@ NtUserGetGUIThreadInfo(
    if(!NT_SUCCESS(Status))
    {
       SetLastNtError(Status);
-      RETURN( FALSE);
+      goto Exit; // Return FALSE
    }
 
-   RETURN( TRUE);
+   Ret = TRUE;
 
-CLEANUP:
-   TRACE("Leave NtUserGetGUIThreadInfo, ret=%u\n",_ret_);
+Exit:
+   TRACE("Leave NtUserGetGUIThreadInfo, ret=%i\n", Ret);
    UserLeave();
-   END_CLEANUP;
+   return Ret;
 }
 
 
@@ -531,7 +539,6 @@ NtUserGetGuiResources(
    PPROCESSINFO W32Process;
    NTSTATUS Status;
    DWORD Ret = 0;
-   DECLARE_RETURN(DWORD);
 
    TRACE("Enter NtUserGetGuiResources\n");
    UserEnterShared();
@@ -546,7 +553,7 @@ NtUserGetGuiResources(
    if(!NT_SUCCESS(Status))
    {
       SetLastNtError(Status);
-      RETURN( 0);
+      goto Exit; // Return 0
    }
 
    W32Process = (PPROCESSINFO)Process->Win32Process;
@@ -554,7 +561,7 @@ NtUserGetGuiResources(
    {
       ObDereferenceObject(Process);
       EngSetLastError(ERROR_INVALID_PARAMETER);
-      RETURN( 0);
+      goto Exit; // Return 0
    }
 
    switch(uiFlags)
@@ -578,12 +585,10 @@ NtUserGetGuiResources(
 
    ObDereferenceObject(Process);
 
-   RETURN( Ret);
-
-CLEANUP:
-   TRACE("Leave NtUserGetGuiResources, ret=%lu\n",_ret_);
+Exit:
+   TRACE("Leave NtUserGetGuiResources, ret=%lu\n", Ret);
    UserLeave();
-   END_CLEANUP;
+   return Ret;
 }
 
 VOID FASTCALL

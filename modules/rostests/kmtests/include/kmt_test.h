@@ -169,10 +169,12 @@ VOID KmtFinishThread(IN PKTHREAD Thread OPTIONAL, IN PKEVENT Event OPTIONAL);
 #elif defined KMT_USER_MODE
 DWORD KmtRunKernelTest(IN PCSTR TestName);
 
-VOID KmtLoadDriver(IN PCWSTR ServiceName, IN BOOLEAN RestartIfRunning);
+DWORD KmtLoadDriver(IN PCWSTR ServiceName, IN BOOLEAN RestartIfRunning);
+VOID KmtUnloadDriverKeepService(VOID);
 VOID KmtUnloadDriver(VOID);
-VOID KmtOpenDriver(VOID);
+DWORD KmtOpenDriver(VOID);
 VOID KmtCloseDriver(VOID);
+DWORD KmtLoadAndOpenDriver(IN PCWSTR ServiceName, IN BOOLEAN RestartIfRunning);
 
 DWORD KmtSendToDriver(IN DWORD ControlCode);
 DWORD KmtSendStringToDriver(IN DWORD ControlCode, IN PCSTR String);
@@ -261,6 +263,9 @@ VOID KmtFreeGuarded(PVOID Pointer);
 #define ok_eq_str(value, expected)          ok(!strcmp(value, expected), #value " = \"%s\", expected \"%s\"\n", value, expected)
 #define ok_eq_wstr(value, expected)         ok(!wcscmp(value, expected), #value " = \"%ls\", expected \"%ls\"\n", value, expected)
 #define ok_eq_tag(value, expected)          ok_eq_print(value, expected, "0x%08lx")
+
+#define ok_eq_hex64(value, expected)        ok_eq_print(value, expected, "%I64x")
+#define ok_eq_xmm(value, expected)          ok((value).Low == (expected).Low, #value " = %I64x'%08I64x, expected %I64x'%08I64x\n", (value).Low, (value).High, (expected).Low, (expected).High)
 
 #define KMT_MAKE_CODE(ControlCode)  CTL_CODE(FILE_DEVICE_UNKNOWN,           \
                                              0xC00 + (ControlCode),         \

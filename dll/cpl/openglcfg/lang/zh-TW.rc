@@ -2,13 +2,13 @@
  * PROJECT:     ReactOS OpenGL Configuration Control Panel
  * LICENSE:     GPL-2.0-or-later (https://spdx.org/licenses/GPL-2.0-or-later)
  * PURPOSE:     Chinese (Traditional) resource file
- * TRANSLATORS: Copyright 2019 Luo Yufan <njlyf2011@hotmail.com>
+ * TRANSLATORS: Copyright 2019 Luke Luo <njlyf2011@hotmail.com>
  *              Copyright 2021 Chan Chilung <eason066@gmail.com>
  */
 
 LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL
 
-IDD_PROPPAGEGENERAL DIALOGEX 0, 0, 246, 228
+IDD_PROPPAGEGENERAL DIALOGEX 0, 0, 246, 220
 STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "一般"
 FONT 9, "新細明體"

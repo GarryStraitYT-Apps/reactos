@@ -45,7 +45,7 @@ BEGIN
     PUSHBUTTON "&Ok", IDOK, 120, 75, 50, 15
     PUSHBUTTON "&Annulla", IDCANCEL, 175, 75, 50, 15
     LTEXT "&Regola per quanto deve rimanere premuto il tasto di un mouse o una trackball prima che il clic sia rilevato", -1, 60, 15, 170, 30
-    ICON IDI_LOOK_KEY, IDC_ICON_CLICK_LOCK, 15, 15, 15, 15
+    ICON IDI_LOCK_KEY, IDC_ICON_CLICK_LOCK, 15, 15, 15, 15
 END
 
 IDD_PAGE_BUTTON DIALOGEX 0, 0, 246, 228
@@ -120,7 +120,7 @@ BEGIN
     ICON IDI_MOUSE_TRAILS, IDC_ICON_POINTER_TRAIL, 15, 119, 15, 15
     CONTROL "", IDC_SLIDER_POINTER_TRAIL, "msctls_trackbar32", TBS_AUTOTICKS | WS_TABSTOP, 80, 130, 74, 17
     CHECKBOX "&Nascondi il puntatore mentre si scrive", IDC_CHECK_HIDE_POINTER, 60, 154, 140, 10
-    ICON IDI_MOUSE_SPEED, IDC_ICON_HIDE_POINTER, 15, 149, 15, 15
+    ICON IDI_MOUSE_HIDE, IDC_ICON_HIDE_POINTER, 15, 149, 15, 15
     CHECKBOX "&Mostra la posizione del puntatore quando si preme il tasto CTRL",
              IDC_CHECK_SHOW_POINTER, 60, 179, 170, 20, BS_MULTILINE | BS_TOP
     ICON IDI_MOUSE_POINTER, IDC_ICON_SHOW_POINTER, 15, 174, 15, 15

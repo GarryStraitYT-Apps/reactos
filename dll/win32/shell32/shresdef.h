@@ -117,6 +117,8 @@
 #define IDS_DRIVE_REMOVABLE      76
 #define IDS_FS_UNKNOWN           77
 
+#define IDS_CREATEFILE_CAPTION    126
+#define IDS_CREATEFILE_DENIED     127
 #define IDS_CREATEFOLDER_DENIED   128
 #define IDS_CREATEFOLDER_CAPTION  129
 #define IDS_DELETEITEM_CAPTION    130
@@ -138,6 +140,7 @@
 #define FCIDM_SHVIEW_NEW          146
 #define IDS_CONTROLPANEL          148
 #define IDS_NEWFOLDER             149
+#define IDS_NEWITEMFORMAT         150
 #define IDS_COLUMN_EXTENSION      151
 #define IDS_NO_EXTENSION          152
 #define IDS_RECYCLEBIN_LOCATION   153
@@ -253,6 +256,11 @@
 #define IDS_MOVEERROR            351
 #define IDS_COPYERROR            352
 
+/* Shortcut property sheet */
+#define IDS_SHORTCUT_RUN_NORMAL  4167
+#define IDS_SHORTCUT_RUN_MIN     4168
+#define IDS_SHORTCUT_RUN_MAX     4169
+
 #define IDS_MENU_EMPTY           34561
 
 /* Note: those strings are referenced from the registry */
@@ -270,6 +278,12 @@
 #define IDS_NETWORKPLACE           9217
 #define IDS_OBJECTS                6466
 #define IDS_OBJECTS_SELECTED       6477
+
+/* Desktop icon titles */
+#define IDS_TITLE_MYCOMP                            30386
+#define IDS_TITLE_MYNET                             30387
+#define IDS_TITLE_BIN_1                             30388
+#define IDS_TITLE_BIN_0                             30389
 
 /* Advanced settings */
 #define IDS_ADVANCED_FOLDER                         30498
@@ -291,6 +305,17 @@
 #define IDS_ADVANCED_CONTROL_PANEL_IN_MY_COMPUTER   30497
 #define IDS_ADVANCED_SHOW_COMP_COLOR                30512
 #define IDS_ADVANCED_SHOW_INFO_TIP                  30502
+
+/* These values must be synchronized with explorer */
+#define IDS_ADVANCED_DISPLAY_FAVORITES              30466
+#define IDS_ADVANCED_DISPLAY_LOG_OFF                30467
+#define IDS_ADVANCED_EXPAND_CONTROL_PANEL           30468
+#define IDS_ADVANCED_EXPAND_MY_DOCUMENTS            30469
+#define IDS_ADVANCED_EXPAND_PRINTERS                30470
+#define IDS_ADVANCED_EXPAND_MY_PICTURES             30472
+#define IDS_ADVANCED_EXPAND_NET_CONNECTIONS         30473
+#define IDS_ADVANCED_DISPLAY_RUN                    30474
+#define IDS_ADVANCED_DISPLAY_ADMINTOOLS             30476
 
 #define IDS_NEWEXT_ADVANCED_LEFT                    30515
 #define IDS_NEWEXT_ADVANCED_RIGHT                   30516
@@ -570,6 +595,10 @@
 #define IDI_SHELL_UPDATE            47
 #define IDI_SHELL_LOCKED            48
 #define IDI_SHELL_DISCONN           49
+#define IDI_SHELL_NONE_50           50
+#define IDI_SHELL_NONE_51           51
+#define IDI_SHELL_NONE_52           52
+#define IDI_SHELL_NONE_53           53
 #define IDI_SHELL_NOT_CONNECTED_HDD 54
 #define IDI_SHELL_MULTIPLE_FILES   133
 #define IDI_SHELL_OPEN_WITH        134

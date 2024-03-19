@@ -447,7 +447,7 @@ ISecurityInformation_fnGetAccessRights(struct ISecurityInformation *this,
                                        ULONG* piDefaultAccess)
 {
     *ppAccess = RegAccess;
-    *pcAccesses = COUNT_OF(RegAccess);
+    *pcAccesses = ARRAY_SIZE(RegAccess);
     *piDefaultAccess = RegDefaultAccess;
     return S_OK;
 }
@@ -475,7 +475,7 @@ ISecurityInformation_fnGetInheritTypes(struct ISecurityInformation *this,
     if (obj->ObjectInfo.dwFlags & SI_CONTAINER)
     {
         *ppInheritTypes = RegInheritTypes;
-        *pcInheritTypes = COUNT_OF(RegInheritTypes);
+        *pcInheritTypes = ARRAY_SIZE(RegInheritTypes);
         return S_OK;
     }
 
@@ -782,8 +782,7 @@ CRegKeySecurity_fnConstructor(LPWSTR lpRegKey,
         obj->ObjectInfo = *ObjectInfo;
         obj->Btn = Btn;
         obj->hRootKey = hRootKey;
-        wcscpy(obj->szRegKey,
-                lpRegKey);
+        StringCbCopyW(obj->szRegKey, sizeof(obj->szRegKey), lpRegKey);
     }
     else
         SetLastError(ERROR_NOT_ENOUGH_MEMORY);

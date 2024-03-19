@@ -38,6 +38,7 @@
 #include "pidl.h"
 #include "shell32_main.h"
 #include "shresdef.h"
+
 #ifdef __REACTOS__
     #include <shlwapi.h>
     #include "ui/layout.h" /* Resizable window */
@@ -464,9 +465,17 @@ static void FillTreeView( browse_info *info, IShellFolder * lpsf,
                     IShellFolder_Release(pSFChild);
                 }
 	    }
+#ifdef __REACTOS__
+        if (ulAttrs != (ulAttrs & SFGAO_FOLDER))
+        {
+	        if (!InsertTreeViewItem(info, lpsf, pidlTemp, pidl, pEnumIL, hParent))
+	            goto done;
+	    }
+#else
 
 	    if (!InsertTreeViewItem(info, lpsf, pidlTemp, pidl, pEnumIL, hParent))
 	        goto done;
+#endif
 	    SHFree(pidlTemp);  /* Finally, free the pidl that the shell gave us... */
 	    pidlTemp=NULL;
 	}
@@ -1044,7 +1053,19 @@ static BOOL BrsFolder_OnCommand( browse_info *info, UINT id )
             info->pidlRet = _ILCreateDesktop();
         pdump( info->pidlRet );
         if (lpBrowseInfo->pszDisplayName)
+#ifdef __REACTOS__
+        {
+            SHFILEINFOW fileInfo = { NULL };
+            lpBrowseInfo->pszDisplayName[0] = UNICODE_NULL;
+            if (SHGetFileInfoW((LPCWSTR)info->pidlRet, 0, &fileInfo, sizeof(fileInfo),
+                               SHGFI_PIDL | SHGFI_DISPLAYNAME))
+            {
+                lstrcpynW(lpBrowseInfo->pszDisplayName, fileInfo.szDisplayName, MAX_PATH);
+            }
+        }
+#else
             SHGetPathFromIDListW( info->pidlRet, lpBrowseInfo->pszDisplayName );
+#endif
         EndDialog( info->hWnd, 1 );
         return TRUE;
 

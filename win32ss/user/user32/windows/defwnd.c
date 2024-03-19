@@ -10,6 +10,7 @@
  */
 
 #include <user32.h>
+#include <immdev.h>
 
 WINE_DEFAULT_DEBUG_CHANNEL(user32);
 
@@ -389,11 +390,11 @@ User32DefWindowProc(HWND hWnd,
             {
                 if (bUnicode)
                 {
-                    SendMessageW(GetParent(hWnd), Msg, wParam, lParam);
+                    SendMessageW(GetParent(hWnd), Msg, (WPARAM)hWnd, lParam);
                 }
                 else
                 {
-                    SendMessageA(GetParent(hWnd), WM_CONTEXTMENU, wParam, lParam);
+                    SendMessageA(GetParent(hWnd), Msg, (WPARAM)hWnd, lParam);
                 }
             }
             else
@@ -546,22 +547,27 @@ User32DefWindowProc(HWND hWnd,
 
         case WM_INPUTLANGCHANGEREQUEST:
         {
-            HKL NewHkl;
+            HKL hNewKL;
+            HWND hwndFocus;
 
-            if(wParam & INPUTLANGCHANGE_BACKWARD
-               && wParam & INPUTLANGCHANGE_FORWARD)
-            {
+            if ((wParam & INPUTLANGCHANGE_BACKWARD) && (wParam & INPUTLANGCHANGE_FORWARD))
                 return FALSE;
+
+            hwndFocus = GetFocus();
+            if (hwndFocus && hwndFocus != hWnd &&
+                GetClassLongPtrW(hWnd, GCW_ATOM) != (ULONG_PTR)WC_DIALOG)
+            {
+                return SendMessageW(hwndFocus, Msg, wParam, lParam);
             }
 
-            //FIXME: What to do with INPUTLANGCHANGE_SYSCHARSET ?
+            if (wParam & INPUTLANGCHANGE_FORWARD)
+                hNewKL = (HKL)UlongToHandle(HKL_NEXT);
+            else if (wParam & INPUTLANGCHANGE_BACKWARD)
+                hNewKL = (HKL)UlongToHandle(HKL_PREV);
+            else
+                hNewKL = (HKL)lParam;
 
-            if(wParam & INPUTLANGCHANGE_BACKWARD) NewHkl = (HKL) HKL_PREV;
-            else if(wParam & INPUTLANGCHANGE_FORWARD) NewHkl = (HKL) HKL_NEXT;
-            else NewHkl = (HKL) lParam;
-
-            NtUserActivateKeyboardLayout(NewHkl, 0);
-
+            NtUserActivateKeyboardLayout(hNewKL, KLF_SETFORPROCESS);
             return TRUE;
         }
 
@@ -987,26 +993,42 @@ RealDefWindowProcA(HWND hWnd,
         case WM_IME_SELECT:
         case WM_IME_NOTIFY:
         case WM_IME_CONTROL:
-        {
-            HWND hwndIME;
-
-            hwndIME = IMM_FN(ImmGetDefaultIMEWnd)(hWnd);
-            if (hwndIME)
-                Result = SendMessageA(hwndIME, Msg, wParam, lParam);
-            break;
-        }
-
         case WM_IME_SETCONTEXT:
+NormalImeMsgHandling:
         {
             HWND hwndIME;
 
+            if (GetWin32ClientInfo()->dwTIFlags & TIF_DISABLEIME)
+            {
+                TRACE("This thread's IME is disabled\n");
+                break;
+            }
+
             hwndIME = IMM_FN(ImmGetDefaultIMEWnd)(hWnd);
-            if (hwndIME)
-                Result = SendMessageA(hwndIME, Msg, wParam, lParam);
+            if (!hwndIME)
+            {
+                ERR("hwndIME was NULL\n");
+                break;
+            }
+
+            if (hwndIME == hWnd)
+            {
+                ImeWndProc_common(hwndIME, Msg, wParam, lParam, FALSE);
+                break;
+            }
+
+            Result = SendMessageA(hwndIME, Msg, wParam, lParam);
             break;
         }
 
-        /* fall through */
+        case WM_IME_SYSTEM:
+        {
+            if (wParam == 4)
+                break;
+
+            goto NormalImeMsgHandling;
+        }
+
         default:
             Result = User32DefWindowProc(hWnd, Msg, wParam, lParam, FALSE);
     }
@@ -1172,23 +1194,40 @@ RealDefWindowProcW(HWND hWnd,
         case WM_IME_SELECT:
         case WM_IME_NOTIFY:
         case WM_IME_CONTROL:
+        case WM_IME_SETCONTEXT:
+NormalImeMsgHandling:
         {
             HWND hwndIME;
 
+            if (GetWin32ClientInfo()->dwTIFlags & TIF_DISABLEIME)
+            {
+                TRACE("This thread's IME is disabled\n");
+                break;
+            }
+
             hwndIME = IMM_FN(ImmGetDefaultIMEWnd)(hWnd);
-            if (hwndIME)
-                Result = SendMessageW(hwndIME, Msg, wParam, lParam);
+            if (!hwndIME)
+            {
+                ERR("hwndIME was NULL\n");
+                break;
+            }
+
+            if (hwndIME == hWnd)
+            {
+                ImeWndProc_common(hwndIME, Msg, wParam, lParam, TRUE);
+                break;
+            }
+
+            Result = SendMessageW(hwndIME, Msg, wParam, lParam);
             break;
         }
 
-        case WM_IME_SETCONTEXT:
+        case WM_IME_SYSTEM:
         {
-            HWND hwndIME;
+            if (wParam == 4)
+                break;
 
-            hwndIME = IMM_FN(ImmGetDefaultIMEWnd)(hWnd);
-            if (hwndIME)
-                Result = SendMessageW(hwndIME, Msg, wParam, lParam);
-            break;
+            goto NormalImeMsgHandling;
         }
 
         default:

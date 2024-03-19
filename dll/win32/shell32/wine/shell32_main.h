@@ -26,6 +26,8 @@
 extern "C" {
 #endif
 
+#include "shell32_version.h"
+
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(*(a)))
 
 /*******************************************
@@ -49,6 +51,14 @@ BOOL HCR_GetDefaultVerbW( HKEY hkeyClass, LPCWSTR szVerb, LPWSTR szDest, DWORD l
 BOOL HCR_GetExecuteCommandW( HKEY hkeyClass, LPCWSTR szClass, LPCWSTR szVerb, LPWSTR szDest, DWORD len ) DECLSPEC_HIDDEN;
 BOOL HCR_GetIconW(LPCWSTR szClass, LPWSTR szDest, LPCWSTR szName, DWORD len, int* picon_idx);
 BOOL HCR_GetClassNameW(REFIID riid, LPWSTR szDest, DWORD len) DECLSPEC_HIDDEN;
+
+#ifdef __REACTOS__
+/* Current User */
+BOOL HCU_GetIconW(LPCWSTR szClass, LPWSTR szDest, LPCWSTR szName, DWORD len, int* picon_idx) DECLSPEC_HIDDEN;
+
+/* Local Machine */
+BOOL HLM_GetIconW(int reg_idx, LPWSTR szDest, DWORD len, int* picon_idx) DECLSPEC_HIDDEN;
+#endif
 
 /* ANSI versions of above functions, supposed to go away as soon as they are not used anymore */
 BOOL HCR_MapTypeToValueA(LPCSTR szExtension, LPSTR szFileType, LONG len, BOOL bPrependDot) DECLSPEC_HIDDEN;
@@ -186,9 +196,9 @@ BOOL SHELL_IsShortcut(LPCITEMIDLIST) DECLSPEC_HIDDEN;
 INT_PTR CALLBACK SH_FileGeneralDlgProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam);
 INT_PTR CALLBACK SH_FileVersionDlgProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam);
 HPROPSHEETPAGE SH_CreatePropertySheetPage(WORD wDialogId, DLGPROC pfnDlgProc, LPARAM lParam, LPCWSTR pwszTitle);
-HRESULT SH_ShowDriveProperties(WCHAR *drive, LPCITEMIDLIST pidlFolder, PCUITEMID_CHILD_ARRAY apidl);
+BOOL SH_ShowDriveProperties(WCHAR *drive, IDataObject *pDataObj);
 BOOL SH_ShowRecycleBinProperties(WCHAR sDrive);
-BOOL SH_ShowPropertiesDialog(LPCWSTR pwszPath, LPCITEMIDLIST pidlFolder, PCUITEMID_CHILD_ARRAY apidl);
+BOOL SH_ShowPropertiesDialog(LPCWSTR pwszPath, IDataObject *pDataObj);
 LPWSTR SH_FormatFileSizeWithBytes(PULARGE_INTEGER lpQwSize, LPWSTR pszBuf, UINT cchBuf);
 
 HRESULT WINAPI DoRegisterServer(void);

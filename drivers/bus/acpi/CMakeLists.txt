@@ -137,6 +137,7 @@ list(APPEND ACPICA_SOURCE
     acpica/utilities/utascii.c
     acpica/utilities/utbuffer.c
     acpica/utilities/utcache.c
+    acpica/utilities/utcksum.c
     # acpica/utilities/utclib.c
     acpica/utilities/utcopy.c
     # acpica/utilities/utdebug.c
@@ -198,7 +199,10 @@ list(APPEND ACPI_SOURCE
     buspdo.c
     main.c)
 
-add_library(acpi MODULE ${ACPI_SOURCE})
+add_library(acpi MODULE
+    ${ACPI_SOURCE}
+    acpi.rc)
+
 set_module_type(acpi kernelmodedriver)
 target_link_libraries(acpi wdmguid acpica memcmp strtol ${PSEH_LIB})
 add_importlibs(acpi ntoskrnl hal)

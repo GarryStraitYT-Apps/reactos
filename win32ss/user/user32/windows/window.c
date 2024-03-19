@@ -701,7 +701,7 @@ User32EnumWindows(HDESK hDesktop,
                                  hWndparent,
                                  bChildren,
                                  dwThreadId,
-                                 lParam,
+                                 dwCount,
                                  NULL,
                                  &dwCount);
     if (!NT_SUCCESS(Status))
@@ -729,7 +729,7 @@ User32EnumWindows(HDESK hDesktop,
                                  hWndparent,
                                  bChildren,
                                  dwThreadId,
-                                 lParam,
+                                 dwCount,
                                  pHwnd,
                                  &dwCount);
     if (!NT_SUCCESS(Status))
@@ -1549,9 +1549,8 @@ IsWindow(HWND hWnd)
     PWND Wnd = ValidateHwndNoErr(hWnd);
     if (Wnd != NULL)
     {
-        if (Wnd->state & WNDS_DESTROYED ||
-            Wnd->state2 & WNDS2_INDESTROY)
-           return FALSE;
+        if (Wnd->state & WNDS_DESTROYED)
+            return FALSE;
         return TRUE;
     }
 
@@ -1975,7 +1974,7 @@ ScrollWindowEx(HWND hWnd,
 {
     if (flags & SW_SMOOTHSCROLL)
     {
-       FIXME("SW_SMOOTHSCROLL not supported.");
+       FIXME("SW_SMOOTHSCROLL not supported.\n");
        // Fall through....
     }
     return NtUserScrollWindowEx(hWnd,

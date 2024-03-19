@@ -17,19 +17,20 @@ include_directories(
     BEFORE include
     ${REACTOS_SOURCE_DIR}/sdk/include/reactos/subsys)
 
+add_library(rtl_um OBJECT
+    rtl/libsupp.c
+    rtl/uilist.c
+    rtl/version.c)
+target_link_libraries(rtl_um ${PSEH_LIB})
+add_dependencies(rtl_um psdk)
+
 list(APPEND SOURCE
-    csr/api.c
-    csr/capture.c
-    csr/connect.c
     dbg/dbgui.c
     ldr/ldrapi.c
     ldr/ldrinit.c
     ldr/ldrpe.c
     ldr/ldrutils.c
     ldr/verifier.c
-    rtl/libsupp.c
-    rtl/uilist.c
-    rtl/version.c
     etw/trace.c)
 
 if(ARCH STREQUAL "i386")
@@ -60,7 +61,7 @@ set_module_type(ntdll win32dll ENTRYPOINT 0)
 set_subsystem(ntdll console)
 ################# END  HACK #################
 
-target_link_libraries(ntdll rtl ntdllsys libcntpr uuid ${PSEH_LIB})
+target_link_libraries(ntdll csrlib rtl rtl_um rtl_vista ntdllsys libcntpr uuid ${PSEH_LIB})
 
 if (STACK_PROTECTOR)
     target_sources(ntdll PRIVATE $<TARGET_OBJECTS:gcc_ssp_nt>)

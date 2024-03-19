@@ -300,8 +300,18 @@ KiIdleLoop(VOID)
             /* The thread is now running */
             NewThread->State = Running;
 
+#ifdef CONFIG_SMP
+            /* Do the swap at SYNCH_LEVEL */
+            KfRaiseIrql(SYNCH_LEVEL);
+#endif
+
             /* Switch away from the idle thread */
             KiSwapContext(APC_LEVEL, OldThread);
+
+#ifdef CONFIG_SMP
+            /* Go back to DISPATCH_LEVEL */
+            KeLowerIrql(DISPATCH_LEVEL);
+#endif
         }
         else
         {
@@ -427,6 +437,9 @@ KiSwapContextEntry(IN PKSWITCHFRAME SwitchFrame,
     /* Get the old thread and set its kernel stack */
     OldThread->KernelStack = SwitchFrame;
 
+    /* Set swapbusy to false for the new thread */
+    NewThread->SwapBusy = FALSE;
+
     /* ISRs can change FPU state, so disable interrupts while checking */
     _disable();
 
@@ -482,6 +495,9 @@ KiDispatchInterrupt(VOID)
     }
     else if (Prcb->NextThread)
     {
+        /* Acquire the PRCB lock */
+        KiAcquirePrcbLock(Prcb);
+
         /* Capture current thread data */
         OldThread = Prcb->CurrentThread;
         NewThread = Prcb->NextThread;

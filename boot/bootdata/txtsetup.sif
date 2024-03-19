@@ -175,6 +175,7 @@ GenDisk = disk,{4D36E967-E325-11CE-BFC1-08002BE10318}
 USB\Class_03 = hidusb
 GENERIC_HID_DEVICE = hidusb
 *PNP0303 = i8042prt,{4D36E96B-E325-11CE-BFC1-08002BE10318}
+*PNP030B = i8042prt,{4D36E96B-E325-11CE-BFC1-08002BE10318}
 *nEC1F00 = inport,{4D36E96F-E325-11CE-BFC1-08002BE10318}
 ROOT\SWENUM = swenum
 
@@ -215,7 +216,7 @@ Cabinet=reactos.cab
 DefaultPath = \ReactOS
 SetupDebugOptions = "/DEBUG /KDSERIAL /DEBUGPORT=COM1 /FIRSTCHANCE"
 ;SetupDebugOptions = "/DEBUG /SOS /DEBUGPORT=SCREEN"
-OsLoadOptions = "/NOGUIBOOT /NODEBUG"
+OsLoadOptions = "/FASTDETECT /NOGUIBOOT /NODEBUG"
 
 [NLS]
 AnsiCodepage     = c_1252.nls
@@ -228,7 +229,7 @@ DefaultLanguage  = 00000409
 pci_up = "Standard PC Uniprocessor"
 ;pci_mp = "Standard PC Multiprocessor"
 acpi_up = "ACPI PC Uniprocessor"
-;acpi_mp = "ACPI PC Multiprocessor"
+acpi_mp = "ACPI PC Multiprocessor"
 apic_up = "Standard APIC PC Uniprocessor"
 aacpi_up = "ACPI APIC PC Uniprocessor"
 xbox = "Original Xbox (x86 based)"
@@ -243,7 +244,7 @@ x64_mp = "Standard x64 Multiprocessor"
 pci_up = "PC UP"
 ;pci_mp = "PC MP"
 acpi_up = "ACPI UP"
-;acpi_mp = "ACPI MP"
+acpi_mp = "ACPI MP"
 apic_up = "APIC UP"
 aacpi_up = "AAPIC UP"
 xbox = "Xbox"
@@ -265,9 +266,9 @@ hal.dll      = 1,,,,,,,2,,,,1,2
 ntoskrnl.exe = 1,,,,,,,2,,,,1,2
 halacpi.dll  = 1,,,,,,,2,,,hal.dll,1,2
 
-;[Files.acpi_mp]
-;ntkrnlmp.exe = 1,,,,,,,2,,,ntoskrnl.exe,1,2
-;halacpi.dll  = 1,,,,,,,2,,,hal.dll,1,2
+[Files.acpi_mp]
+ntkrnlmp.exe = 1,,,,,,,2,,,ntoskrnl.exe,1,2
+halmacpi.dll  = 1,,,,,,,2,,,hal.dll,1,2
 
 [Files.apic_up]
 ntoskrnl.exe = 1,,,,,,,2,,,,1,2
@@ -280,6 +281,7 @@ halaacpi.dll  = 1,,,,,,,2,,,hal.dll,1,2
 [Files.xbox]
 ntoskrnl.exe = 1,,,,,,,2,,,,1,2
 halxbox.dll  = 1,,,,,,,2,,,hal.dll,1,2
+vfatfs.sys   = 1,,,,,,,4,,,,1,4
 
 [Files.pc98_up]
 ntoskrnl.exe = 1,,,,,,,2,,,,1,2
@@ -568,13 +570,13 @@ Default = "XT-, AT- or extended keyboard (83-105 keys)"
 00020401 = kbda3.dll
 00020402 = kbdbgt.dll
 00030402 = kbdbga.dll
-00040402 = kbdbgm.dll
+00040402 = kbdbu.dll
 00000405 = kbdcz.dll
 00010405 = kbdcz1.dll
 00000406 = kbdda.dll
 00000407 = kbdgr.dll
 00000807 = kbdsg.dll
-00010407 = kbdgrist.dll
+00010407 = kbdgr1.dll
 00020407 = kbdgneo.dll
 00030407 = kbdgerg.dll
 00000408 = kbdhe.dll
@@ -588,7 +590,7 @@ Default = "XT-, AT- or extended keyboard (83-105 keys)"
 00030409 = kbdusl.dll
 00040409 = kbdusr.dll
 00050409 = kbdusa.dll
-0000040A = kbdes.dll
+0000040A = kbdsp.dll
 0000080A = kbdla.dll
 0000040B = kbdfi.dll
 0000040C = kbdfr.dll
@@ -598,8 +600,8 @@ Default = "XT-, AT- or extended keyboard (83-105 keys)"
 0000040E = kbdhu.dll
 0000040F = kbdic.dll
 00000410 = kbdit.dll
-00000411 = kbdja.dll
-00000412 = kbdko.dll
+00000411 = kbdjpn.dll
+00000412 = kbdkor.dll
 00000413 = kbdne.dll
 00000813 = kbdbe.dll
 00000414 = kbdno.dll
@@ -613,8 +615,8 @@ Default = "XT-, AT- or extended keyboard (83-105 keys)"
 0000041A = kbdcr.dll
 0000081A = kbdycl.dll
 00000C1A = kbdycc.dll
-0000041B = kbdsk.dll
-0001041B = kbdsk1.dll
+0000041B = kbdsl.dll
+0001041B = kbdsl1.dll
 0000041C = kbdal.dll
 0000041D = kbdsw.dll
 0000041E = kbdth0.dll

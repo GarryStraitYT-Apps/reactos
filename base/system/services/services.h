@@ -73,6 +73,7 @@ typedef struct _SERVICE
     DWORD dwTag;
 
     DWORD dwServiceBits;
+    DWORD dwServiceTag;
 
     ULONG Flags;
 
@@ -102,6 +103,7 @@ extern LIST_ENTRY ImageListHead;
 extern BOOL ScmInitialize;
 extern BOOL ScmShutdown;
 extern BOOL ScmLiveSetup;
+extern BOOL ScmSetupInProgress;
 extern PSECURITY_DESCRIPTOR pPipeSD;
 
 

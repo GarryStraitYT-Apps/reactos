@@ -43,6 +43,7 @@
     #define APIC_GENERIC_VECTOR  0xC1 // IRQL 27
     #define APIC_CLOCK_VECTOR    0xD1 // IRQL 28
     #define APIC_SYNCH_VECTOR    0xD1 // IRQL 28
+    #define CLOCK_IPI_VECTOR     0xD2 // IRQL 28
     #define APIC_IPI_VECTOR      0xE1 // IRQL 29
     #define APIC_ERROR_VECTOR    0xE3
     #define POWERFAIL_VECTOR     0xEF // IRQL 30
@@ -151,7 +152,7 @@ typedef enum _APIC_DSH
     APIC_DSH_Destination,
     APIC_DSH_Self,
     APIC_DSH_AllIncludingSelf,
-    APIC_DSH_AllExclusingSelf
+    APIC_DSH_AllExcludingSelf
 } APIC_DSH;
 
 /* Write Constants */
@@ -170,7 +171,7 @@ typedef enum _APIC_RRS
 } APIC_RRS;
 
 /* Timer Constants */
-enum _TIMER_DV
+typedef enum _TIMER_DV
 {
     TIMER_DV_DivideBy2 = 0,
     TIMER_DV_DivideBy4 = 1,
@@ -183,7 +184,7 @@ enum _TIMER_DV
 } TIMER_DV;
 
 #include <pshpack1.h>
-typedef union _APIC_BASE_ADRESS_REGISTER
+typedef union _APIC_BASE_ADDRESS_REGISTER
 {
     UINT64 LongLong;
     struct
@@ -195,7 +196,7 @@ typedef union _APIC_BASE_ADRESS_REGISTER
         UINT64 BaseAddress:40;
         UINT64 ReservedMBZ:12;
     };
-} APIC_BASE_ADRESS_REGISTER;
+} APIC_BASE_ADDRESS_REGISTER;
 
 typedef union _APIC_SPURIOUS_INERRUPT_REGISTER
 {
@@ -277,20 +278,14 @@ typedef union _LVT_REGISTER
 } LVT_REGISTER;
 
 /* IOAPIC offsets */
-enum
-{
-    IOAPIC_IOREGSEL = 0x00,
-    IOAPIC_IOWIN    = 0x10
-};
+#define IOAPIC_IOREGSEL 0x00
+#define IOAPIC_IOWIN    0x10
 
 /* IOAPIC Constants */
-enum
-{
-    IOAPIC_ID  = 0x00,
-    IOAPIC_VER = 0x01,
-    IOAPIC_ARB = 0x02,
-    IOAPIC_REDTBL = 0x10
-};
+#define IOAPIC_ID     0x00
+#define IOAPIC_VER    0x01
+#define IOAPIC_ARB    0x02
+#define IOAPIC_REDTBL 0x10
 
 typedef union _IOAPIC_REDIRECTION_REGISTER
 {
@@ -303,7 +298,7 @@ typedef union _IOAPIC_REDIRECTION_REGISTER
     struct
     {
         UINT64 Vector:8;
-        UINT64 DeliveryMode:3;
+        UINT64 MessageType:3;
         UINT64 DestinationMode:1;
         UINT64 DeliveryStatus:1;
         UINT64 Polarity:1;

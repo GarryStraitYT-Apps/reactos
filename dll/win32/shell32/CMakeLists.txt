@@ -13,6 +13,10 @@ add_definitions(
     -D_SHELL32_
     -D_WINE)
 
+if(DBG)
+    add_definitions(-D_DEBUG=1) # CORE-17505
+endif()
+
 list(APPEND SOURCE
     CActiveDesktop.cpp
     CActiveDesktop.h
@@ -36,6 +40,7 @@ list(APPEND SOURCE
     folders.cpp
     iconcache.cpp
     shell32.cpp
+    utils.cpp
     CShellItem.cpp
     CShellLink.cpp
     CFolderOptions.cpp
@@ -68,8 +73,7 @@ list(APPEND SOURCE
     COpenWithMenu.cpp
     CNewMenu.cpp
     CSendToMenu.cpp
-    CCopyToMenu.cpp
-    CMoveToMenu.cpp
+    CCopyMoveToMenu.cpp
     CShellDispatch.cpp
     CFolder.cpp
     CFolderItems.cpp

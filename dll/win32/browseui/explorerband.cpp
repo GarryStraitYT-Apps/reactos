@@ -149,6 +149,7 @@ CExplorerBand::CExplorerBand()
     , m_fVisible(FALSE)
     , m_bNavigating(FALSE)
     , m_dwBandID(0)
+    , m_isEditing(FALSE)
     , m_pidlCurrent(NULL)
 {
 }
@@ -346,7 +347,7 @@ BOOL CExplorerBand::OnTreeItemExpanding(LPNMTREEVIEW pnmtv)
 BOOL CExplorerBand::OnTreeItemDeleted(LPNMTREEVIEW pnmtv)
 {
     /* Destroy memory associated to our node */
-    NodeInfo* ptr = GetNodeInfo(pnmtv->itemNew.hItem);
+    NodeInfo* ptr = GetNodeInfo(pnmtv->itemOld.hItem);
     if (ptr)
     {
         ILFree(ptr->relativePidl);
@@ -373,27 +374,36 @@ void CExplorerBand::OnSelectionChanged(LPNMTREEVIEW pnmtv)
 
 void CExplorerBand::OnTreeItemDragging(LPNMTREEVIEW pnmtv, BOOL isRightClick)
 {
-    CComPtr<IShellFolder>               pSrcFolder;
-    CComPtr<IDataObject>                pObj;
-    LPCITEMIDLIST                       pLast;
-    HRESULT                             hr;
-    DWORD                               dwEffect;
-    DWORD                               dwEffect2;
-
-    dwEffect = DROPEFFECT_COPY | DROPEFFECT_MOVE;
     if (!pnmtv->itemNew.lParam)
         return;
+
     NodeInfo* pNodeInfo = GetNodeInfo(pnmtv->itemNew.hItem);
+
+    HRESULT hr;
+    CComPtr<IShellFolder> pSrcFolder;
+    LPCITEMIDLIST pLast;
     hr = SHBindToParent(pNodeInfo->absolutePidl, IID_PPV_ARG(IShellFolder, &pSrcFolder), &pLast);
     if (!SUCCEEDED(hr))
         return;
-    hr = pSrcFolder->GetUIObjectOf(m_hWnd, 1, &pLast, IID_IDataObject, 0, reinterpret_cast<void**>(&pObj));
+
+    SFGAOF attrs = SFGAO_CANCOPY | SFGAO_CANMOVE | SFGAO_CANLINK;
+    pSrcFolder->GetAttributesOf(1, &pLast, &attrs);
+
+    DWORD dwEffect = 0;
+    if (attrs & SFGAO_CANCOPY)
+        dwEffect |= DROPEFFECT_COPY;
+    if (attrs & SFGAO_CANMOVE)
+        dwEffect |= DROPEFFECT_MOVE;
+    if (attrs & SFGAO_CANLINK)
+        dwEffect |= DROPEFFECT_LINK;
+
+    CComPtr<IDataObject> pObj;
+    hr = pSrcFolder->GetUIObjectOf(m_hWnd, 1, &pLast, IID_IDataObject, 0, (LPVOID*)&pObj);
     if (!SUCCEEDED(hr))
         return;
-    DoDragDrop(pObj, this, dwEffect, &dwEffect2);
-    return;
-}
 
+    DoDragDrop(pObj, this, dwEffect, &dwEffect);
+}
 
 // *** ATL event handlers ***
 LRESULT CExplorerBand::OnContextMenu(UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL &bHandled)
@@ -565,7 +575,7 @@ HTREEITEM CExplorerBand::InsertItem(HTREEITEM hParent, IShellFolder *psfParent, 
         return NULL;
 
     /* Ignore streams */
-    if ((attrs & SFGAO_STREAM))
+    if (attrs & SFGAO_STREAM)
     {
         TRACE("Ignoring stream\n");
         return NULL;
@@ -726,7 +736,6 @@ BOOL CExplorerBand::NavigateToPIDL(LPITEMIDLIST dest, HTREEITEM *item, BOOL bExp
     HTREEITEM                           current;
     HTREEITEM                           tmp;
     HTREEITEM                           parent;
-    BOOL                                found;
     NodeInfo                            *nodeData;
     LPITEMIDLIST                        relativeChild;
     TVITEM                              tvItem;
@@ -734,10 +743,9 @@ BOOL CExplorerBand::NavigateToPIDL(LPITEMIDLIST dest, HTREEITEM *item, BOOL bExp
     if (!item)
         return FALSE;
 
-    found = FALSE;
     current = m_hRoot;
     parent = NULL;
-    while(!found)
+    while (TRUE)
     {
         nodeData = GetNodeInfo(current);
         if (!nodeData)
@@ -811,7 +819,7 @@ BOOL CExplorerBand::NavigateToPIDL(LPITEMIDLIST dest, HTREEITEM *item, BOOL bExp
         *item = NULL;
         return FALSE;
     }
-    return FALSE;
+    UNREACHABLE;
 }
 
 BOOL CExplorerBand::NavigateToCurrentFolder()
@@ -1219,7 +1227,8 @@ HRESULT STDMETHODCALLTYPE CExplorerBand::HasFocusIO()
 
 HRESULT STDMETHODCALLTYPE CExplorerBand::TranslateAcceleratorIO(LPMSG lpMsg)
 {
-    if (lpMsg->hwnd == m_hWnd)
+    if (lpMsg->hwnd == m_hWnd ||
+        (m_isEditing && IsChild(lpMsg->hwnd)))
     {
         TranslateMessage(lpMsg);
         DispatchMessage(lpMsg);
@@ -1296,6 +1305,7 @@ HRESULT STDMETHODCALLTYPE CExplorerBand::OnWinEvent(HWND hWnd, UINT uMsg, WPARAM
             case TVN_BEGINDRAG:
             case TVN_BEGINRDRAG:
                 OnTreeItemDragging((LPNMTREEVIEW)lParam, pNotifyHeader->code == TVN_BEGINRDRAG);
+                break;
             case TVN_BEGINLABELEDITW:
             {
                 // TODO: put this in a function ? (mostly copypasta from CDefView)
@@ -1315,8 +1325,12 @@ HRESULT STDMETHODCALLTYPE CExplorerBand::OnWinEvent(HWND hWnd, UINT uMsg, WPARAM
                     return E_FAIL;
 
                 hr = pParent->GetAttributesOf(1, &pChild, &dwAttr);
-                if (SUCCEEDED(hr) && (dwAttr & SFGAO_CANRENAME) && theResult)
-                    *theResult = 0;
+                if (SUCCEEDED(hr) && (dwAttr & SFGAO_CANRENAME))
+                {
+                    if (theResult)
+                        *theResult = 0;
+                    m_isEditing = TRUE;
+                }
                 return S_OK;
             }
             case TVN_ENDLABELEDITW:
@@ -1325,6 +1339,7 @@ HRESULT STDMETHODCALLTYPE CExplorerBand::OnWinEvent(HWND hWnd, UINT uMsg, WPARAM
                 NodeInfo *info = GetNodeInfo(dispInfo->item.hItem);
                 HRESULT hr;
 
+                m_isEditing = FALSE;
                 if (theResult)
                     *theResult = 0;
                 if (dispInfo->item.pszText)
